@@ -10,7 +10,7 @@ endif
 
 # C specific options here (added to USE_OPT).
 ifeq ($(USE_COPT),)
-  USE_COPT = 
+  USE_COPT =
 endif
 
 # C++ specific options here (added to USE_OPT).
@@ -25,7 +25,7 @@ endif
 
 # Linker extra options here.
 ifeq ($(USE_LDOPT),)
-  USE_LDOPT = 
+  USE_LDOPT =
 endif
 
 # Enable this if you want link time optimizations (LTO)
@@ -105,19 +105,6 @@ include $(CHIBIOS)/os/common/ports/ARMCMx/compilers/GCC/mk/port_v7m.mk
 # Define linker script file here
 LDSCRIPT= $(STARTUPLD)/STM32F103x8.ld
 
-# mavlink header generation
-MAVLINK_SUBDIR = v1.0
-MAVLINK_WIRE_PROTOCOL = 1.0
-MAVLINK_DIR = modules/mavlink
-MESSAGE_DEFINITIONS = modules/mavlink/message_definitions/v1.0
-# MAVLINK_HEADERS = 
-MAVLINK_OUTPUT_DIR = $(BUILDDIR)/modules/mavlink/$(MAVLINK_SUBDIR)
-
-#@echo Generating MAVLink headers...
-#goto mavlink module directory and run the most recent generator script
-#@echo "Generating C code using mavgen.py located at" /modules/mavlink/
-$(info $(shell py $(MAVLINK_DIR)/pymavlink/tools/mavgen.py --lang=C --wire-protocol=$(MAVLINK_WIRE_PROTOCOL) --output=$(MAVLINK_OUTPUT_DIR) $(MESSAGE_DEFINITIONS)/ardupilotmega.xml))
-
 # C sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
 CSRC = $(STARTUPSRC) \
@@ -128,7 +115,7 @@ CSRC = $(STARTUPSRC) \
        $(PLATFORMSRC) \
        $(BOARDSRC) \
        $(CHIBIOS)/os/hal/lib/streams/chprintf.c
-       
+
 CSRC += $(wildcard src/*.c)	    \
 		$(wildcard src/*/*.c)	\
 		$(wildcard src/*/*/*.c)
@@ -166,7 +153,6 @@ INCDIR = $(CHIBIOS)/os/license \
          $(HALINC) $(PLATFORMINC) $(BOARDINC) \
          $(CHIBIOS)/os/various \
          $(CHIBIOS)/os/hal/lib/streams \
-         $(MAVLINK_OUTPUT_DIR)/ardupilotmega \
 
 #
 # Project, sources and paths

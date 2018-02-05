@@ -18,14 +18,10 @@
 #define _BOARD_H_
 
 /*
- * Setup for the Olimex STM32-P103 proto board.
- */
-
-/*
  * Board identifier.
  */
-#define BOARD_OLIMEX_STM32_P103
-#define BOARD_NAME              "Cam_CTRL_Rev1"
+//#define BOARD_OLIMEX_STM32_P103
+#define BOARD_NAME              "Gimbal_CTRL_Rev1"
 
 /*
  * Board frequencies.
@@ -41,8 +37,8 @@
 /*
  * IO pins assignments.
  */
-#define GPIOB_LED 0
-
+#define GPIOB_LED_RED 1
+#define GPIOB_LED_GREEN 2
 
 /*
  * I/O ports initial setup, this configuration is established soon after reset
@@ -82,18 +78,17 @@
 /*
  * Port B setup.
  * Everything input with pull-up except:
- * PB0  - Push Pull output     (LED).
+ * PB4 PB5  - Push Pull output     (LED).
  * PB10 - Alternate Push pull  (USART3_TX).
  * PB11 - Input with pull up   (USART3_RX).
  */
-#define VAL_GPIOBCRL            0x88888882      /*  PB7...PB0 */
+#define VAL_GPIOBCRL            0x88888228      /*  PB7...PB0 */
 #define VAL_GPIOBCRH            0x88888B88      /* PB15...PB8 */
 #define VAL_GPIOBODR            0xFFFFFFFF
 
 /*
  * Port C setup.
  * Everything input with pull-up except:
- *
  */
 #define VAL_GPIOCCRL            0x88888888      /*  PC7...PC0 */
 #define VAL_GPIOCCRH            0x88888888      /* PC15...PC8 */
