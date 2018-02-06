@@ -1,5 +1,2 @@
 build/*
 .dep/*
-.cproject
-.project
-.settings/*
