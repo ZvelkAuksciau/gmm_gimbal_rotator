@@ -1,5 +1,8 @@
 #include "ch.h"
 #include "hal.h"
+
+#include "canard.h"
+
 //#include "stdlib.h"
 
 //#include "km_math.h"

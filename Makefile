@@ -200,6 +200,7 @@ CPPWARN = -Wall -Wextra -Wundef
 ##############################################################################
 # Start of user section
 #
+CSRC += $(wildcard modules/libcanard/*.c)
 
 # List all user C define here, like -D_DEBUG=1
 UDEFS =
@@ -208,7 +209,7 @@ UDEFS =
 UADEFS =
 
 # List all user directories here
-UINCDIR =
+UINCDIR = modules/libcanard/
 
 # List the user directory to look for the libraries here
 ULIBDIR =
