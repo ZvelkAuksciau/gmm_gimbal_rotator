@@ -223,3 +223,7 @@ ULIBS = -lm
 
 RULESPATH = $(CHIBIOS)/os/common/startup/ARMCMx/compilers/GCC
 include $(RULESPATH)/rules.mk
+
+program:
+	st-flash write build/gimb_ctrl.bin 0x8000000
+
