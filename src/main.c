@@ -3,13 +3,14 @@
 
 #include "canard.h"
 
-//#include "stdlib.h"
-
-//#include "km_math.h"
-//#include "chprintf.h"
-
-static SerialConfig serialCfg = {
-  9600
+/*
+ * standard 9600 baud serial config.
+ */
+static const SerialConfig serialCfg = {
+  9600,
+  0,
+  0,
+  0
 };
 
 /*
@@ -19,31 +20,12 @@ static const SPIConfig ls_spicfg = {
   NULL,
   GPIOA,
   GPIOA_SPI1NSS,
-  SPI_CR1_BR_2 | SPI_CR1_BR_1 | SPI_CR1_CPHA
+  SPI_CR1_BR_2 | SPI_CR1_BR_1 | SPI_CR1_CPHA,
+  0
 };
 
-/*
- * SPI TX and RX buffers.
- */
-static uint16_t spi_rx_buf;
-
-const uint16_t AS5048A_CLEAR_ERROR_FLAG              = 0x0001;
-const uint16_t AS5048A_PROGRAMMING_CONTROL           = 0x0003;
-const uint16_t AS5048A_OTP_REGISTER_ZERO_POS_HIGH    = 0x0016;
-const uint16_t AS5048A_OTP_REGISTER_ZERO_POS_LOW     = 0x0017;
-const uint16_t AS5048A_DIAG_AGC                      = 0x3FFD;
-const uint16_t AS5048A_MAGNITUDE                     = 0x3FFE;
-const uint16_t AS5048A_ANGLE                         = 0x3FFF;
-
-/*
- * Red LED blinker thread, times are in milliseconds.
- */
 static THD_WORKING_AREA(waThread1, 128);
-static THD_WORKING_AREA(waThread2, 128);
-
-static msg_t Thread1(void *arg) {
-  (void)arg;
-
+void Thread1(void) {
   chRegSetThreadName("blinker");
 
   while(1) {
@@ -56,12 +38,21 @@ static msg_t Thread1(void *arg) {
   }
 }
 
-static msg_t Thread2(void *arg) {
-  (void)arg;
-  uint8_t buf = '.';
-  int rotation;
-
+static THD_WORKING_AREA(waThread2, 128);
+void Thread2(void) {
   chRegSetThreadName("rotary_position_sensor");
+  /*
+  const uint16_t AS5048A_CLEAR_ERROR_FLAG              = 0x0001;
+  const uint16_t AS5048A_PROGRAMMING_CONTROL           = 0x0003;
+  const uint16_t AS5048A_OTP_REGISTER_ZERO_POS_HIGH    = 0x0016;
+  const uint16_t AS5048A_OTP_REGISTER_ZERO_POS_LOW     = 0x0017;
+  const uint16_t AS5048A_DIAG_AGC                      = 0x3FFD;
+  const uint16_t AS5048A_MAGNITUDE                     = 0x3FFE;
+  */
+  const uint8_t AS5048A_ANGLE[2] = {0x3F, 0xFF};
+  const uint8_t buf1[4] = "mag:";
+  const uint8_t buf2[2] = "\r\n";
+  static uint8_t spi_rx_buf[2];
 
   while(1) {
     chThdSleepMilliseconds(500);
@@ -72,8 +63,9 @@ static msg_t Thread2(void *arg) {
     spiExchange(&SPID1, 2, AS5048A_ANGLE, &spi_rx_buf);
     spiUnselect(&SPID1);
     spiReleaseBus(&SPID1);
-    sdWrite(&SD1, &spi_rx_buf, 2);
-    sdWrite(&SD1, &buf, 1);
+    sdWrite(&SD1, &buf1[0], 4);
+    sdWrite(&SD1, &spi_rx_buf[0], 2);
+    sdWrite(&SD1, &buf2[0], 2);
   }
 }
 
@@ -82,10 +74,8 @@ int main(void) {
   chSysInit();
   sdStart(&SD1, &serialCfg);
 
-  chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, Thread1, NULL);
-  chThdCreateStatic(waThread2, sizeof(waThread2), NORMALPRIO, Thread2, NULL);
-
-  chThdSleepMilliseconds(500);
+  chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, (tfunc_t)Thread1, NULL);
+  chThdCreateStatic(waThread2, sizeof(waThread2), NORMALPRIO, (tfunc_t)Thread2, NULL);
 
   while(1) {
     chThdSleepMilliseconds(500);
