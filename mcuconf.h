@@ -45,16 +45,10 @@
 #define STM32_PLLSRC                        STM32_PLLSRC_HSE
 #define STM32_PLLXTPRE                      STM32_PLLXTPRE_DIV2
 #define STM32_PLLMUL_VALUE                  9
-
-#define STM32_HPRE                          STM32_HPRE_DIV2
-#define STM32_PPRE1                         STM32_PPRE1_DIV4
-#define STM32_PPRE2                         STM32_PPRE2_DIV4
-/*
 #define STM32_HPRE                          STM32_HPRE_DIV1
 #define STM32_PPRE1                         STM32_PPRE1_DIV2
 #define STM32_PPRE2                         STM32_PPRE2_DIV2
 #define STM32_ADCPRE                        STM32_ADCPRE_DIV8
-*/
 #define STM32_USB_CLOCK_REQUIRED            FALSE
 #define STM32_USBPRE                        STM32_USBPRE_DIV1P5
 #define STM32_MCOSEL                        STM32_MCOSEL_NOCLOCK
@@ -161,7 +155,7 @@
  */
 #define STM32_SERIAL_USE_USART1             TRUE
 #define STM32_SERIAL_USE_USART2             FALSE
-#define STM32_SERIAL_USE_USART3             TRUE
+#define STM32_SERIAL_USE_USART3             FALSE
 #define STM32_SERIAL_USE_UART4              FALSE
 #define STM32_SERIAL_USE_UART5              FALSE
 #define STM32_SERIAL_USART1_PRIORITY        12
@@ -193,7 +187,7 @@
 /*
  * UART driver system settings.
  */
-#define STM32_UART_USE_USART1               TRUE
+#define STM32_UART_USE_USART1               FALSE
 #define STM32_UART_USE_USART2               FALSE
 #define STM32_UART_USE_USART3               FALSE
 #define STM32_UART_USART1_IRQ_PRIORITY      12

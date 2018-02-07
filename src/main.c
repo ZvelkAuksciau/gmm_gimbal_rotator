@@ -8,6 +8,10 @@
 //#include "km_math.h"
 //#include "chprintf.h"
 
+static SerialConfig serialCfg = {
+  9600,
+};
+
 /*
  * Red LED blinker thread, times are in milliseconds.
  */
@@ -25,15 +29,15 @@ static msg_t Thread1(void *arg) {
     chThdSleepMilliseconds(500);
     palSetPad(GPIOB, GPIOB_LED_RED);
     palSetPad(GPIOB, GPIOB_LED_GREEN);
-    uartStartSend(&UARTD1, 1, &buf);
+    sdWrite(&SD1, &buf, 1);
     chThdSleepMilliseconds(500);
   }
 }
 
 int main(void) {
   halInit();
-  uartInit();
   chSysInit();
+  sdStart(&SD1, &serialCfg);
 
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, Thread1, NULL);
 
