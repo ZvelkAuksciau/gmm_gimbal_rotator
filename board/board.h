@@ -96,7 +96,7 @@
  * PB10 - Alternate Push pull  (USART3_TX).
  * PB11 - Input with pull up   (USART3_RX).
  */
-#define VAL_GPIOBCRL            0x88998229      /*  PB7...PB0 */
+#define VAL_GPIOBCRL            0x88BB822B      /*  PB7...PB0 */
 #define VAL_GPIOBCRH            0x888BBB88      /* PB15...PB8 */
 #define VAL_GPIOBODR            0xFFFFFFFF
 

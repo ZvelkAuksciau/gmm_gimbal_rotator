@@ -24,6 +24,20 @@ static const SPIConfig ls_spicfg = {
   0
 };
 
+static const PWMConfig pwm_cfg = {
+    10000,                              /* 10kHz PWM clock frequency  */
+    10000,                              /* PWM period (in ticks) 1S (1/10kHz=0.1mS 0.1ms*10000 ticks=1S) */
+    NULL,                               /* No Callback */
+    {
+        {PWM_OUTPUT_ACTIVE_HIGH, NULL}, /* Enable Channel 0 */
+        {PWM_OUTPUT_ACTIVE_HIGH, NULL}, /* Enable Channel 1 */
+        {PWM_OUTPUT_ACTIVE_HIGH, NULL}, /* Enable Channel 3 */
+        {PWM_OUTPUT_DISABLED, NULL}
+    },
+    0,                                  /* HW dependent part.*/
+    0
+};
+
 static THD_WORKING_AREA(waThread1, 128);
 void Thread1(void) {
   chRegSetThreadName("blinker");
@@ -85,6 +99,11 @@ void Thread3(void) {
     if (step_A > 47) step_A = 0;
     if (step_B > 47) step_B = 0;
     if (step_C > 47) step_C = 0;
+
+    pwmEnableChannel(&PWMD3, 0, 5000);
+    pwmEnableChannel(&PWMD3, 1, 5000);
+    pwmEnableChannel(&PWMD3, 2, 5000);
+
     chThdSleepMilliseconds(1);
 
   }
@@ -92,8 +111,13 @@ void Thread3(void) {
 
 int main(void) {
   halInit();
+
+  AFIO->MAPR |= AFIO_MAPR_SWJ_CFG_0; // configure PB4 pin to be used as PWM output instead of JTAG
+  AFIO->MAPR |= AFIO_MAPR_TIM3_REMAP_PARTIALREMAP; // configure alternate mode for PWM
+
   chSysInit();
   sdStart(&SD1, &serialCfg);
+  pwmStart(&PWMD3, &pwm_cfg);
 
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, (tfunc_t)Thread1, NULL);
   chThdCreateStatic(waThread2, sizeof(waThread2), NORMALPRIO, (tfunc_t)Thread2, NULL);
