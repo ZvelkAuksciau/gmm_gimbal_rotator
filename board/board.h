@@ -41,6 +41,13 @@
 #define GPIOB_LED_GREEN 2
 #define GPIOA_SPI1NSS 4
 
+#define GPIOB_IN1 4
+#define GPIOB_IN2 5
+#define GPIOB_IN3 0
+#define GPIOB_EN1 10
+#define GPIOB_EN2 11
+#define GPIOB_EN3 12
+
 /*
  * I/O ports initial setup, this configuration is established soon after reset
  * in the initialization code.
@@ -83,12 +90,14 @@
 /*
  * Port B setup.
  * Everything input with pull-up except:
- * PB4 PB5  - Push Pull output     (LED).
+ * PB1 PB2  - Push Pull output     (LED).
+ * PB0 PB4 PB5 - Alternate Push Pull output motor driver.
+ * PB10 PB11 PB12 - Push Pull output motor driver.
  * PB10 - Alternate Push pull  (USART3_TX).
  * PB11 - Input with pull up   (USART3_RX).
  */
-#define VAL_GPIOBCRL            0x88888228      /*  PB7...PB0 */
-#define VAL_GPIOBCRH            0x88888B88      /* PB15...PB8 */
+#define VAL_GPIOBCRL            0x88998229      /*  PB7...PB0 */
+#define VAL_GPIOBCRH            0x888BBB88      /* PB15...PB8 */
 #define VAL_GPIOBODR            0xFFFFFFFF
 
 /*

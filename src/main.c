@@ -69,6 +69,27 @@ void Thread2(void) {
   }
 }
 
+static THD_WORKING_AREA(waThread3, 128);
+void Thread3(void) {
+  chRegSetThreadName("motor");
+
+  uint8_t step_A = 0;
+  uint8_t step_B = 16;
+  uint8_t step_C = 32;
+
+  while(1) {
+    step_A++;
+    step_B++;
+    step_C++;
+
+    if (step_A > 47) step_A = 0;
+    if (step_B > 47) step_B = 0;
+    if (step_C > 47) step_C = 0;
+    chThdSleepMilliseconds(1);
+
+  }
+}
+
 int main(void) {
   halInit();
   chSysInit();
@@ -76,6 +97,7 @@ int main(void) {
 
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, (tfunc_t)Thread1, NULL);
   chThdCreateStatic(waThread2, sizeof(waThread2), NORMALPRIO, (tfunc_t)Thread2, NULL);
+  chThdCreateStatic(waThread3, sizeof(waThread3), NORMALPRIO, (tfunc_t)Thread3, NULL);
 
   while(1) {
     chThdSleepMilliseconds(500);
