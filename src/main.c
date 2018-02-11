@@ -25,9 +25,9 @@ static const SPIConfig ls_spicfg = {
 };
 
 static const PWMConfig pwm_cfg = {
-    10000,                              /* 10kHz PWM clock frequency  */
-    10000,                              /* PWM period (in ticks) 1S (1/10kHz=0.1mS 0.1ms*10000 ticks=1S) */
-    NULL,                               /* No Callback */
+    10000000,                           // 10MHz PWM clock frequency
+    1000,                               // PWM period (in ticks) == 10kHz
+    NULL,                               // No Callback
     {
         {PWM_OUTPUT_ACTIVE_HIGH, NULL}, /* Enable Channel 0 */
         {PWM_OUTPUT_ACTIVE_HIGH, NULL}, /* Enable Channel 1 */
@@ -87,9 +87,14 @@ static THD_WORKING_AREA(waThread3, 128);
 void Thread3(void) {
   chRegSetThreadName("motor");
 
+  const int pwm_sin[]={511,444,379,315,256,200,150,106,68,39,17,4,0,4,17,39,68,106,150,200,256,315,379,444,511,578,643,707,767,822,872,916,954,983,1005,1018,1022,1018,1005,983,954,916,872,822,767,707,643,578,511};
   uint8_t step_A = 0;
   uint8_t step_B = 16;
   uint8_t step_C = 32;
+
+  palSetPad(GPIOB, GPIOB_EN1);
+  palSetPad(GPIOB, GPIOB_EN2);
+  palSetPad(GPIOB, GPIOB_EN3);
 
   while(1) {
     step_A++;
@@ -100,11 +105,11 @@ void Thread3(void) {
     if (step_B > 47) step_B = 0;
     if (step_C > 47) step_C = 0;
 
-    pwmEnableChannel(&PWMD3, 0, 5000);
-    pwmEnableChannel(&PWMD3, 1, 5000);
-    pwmEnableChannel(&PWMD3, 2, 5000);
+    pwmEnableChannel(&PWMD3, 0, pwm_sin[step_A]);
+    pwmEnableChannel(&PWMD3, 1, pwm_sin[step_B]);
+    pwmEnableChannel(&PWMD3, 2, pwm_sin[step_C]);
 
-    chThdSleepMilliseconds(1);
+    chThdSleepMilliseconds(10);
 
   }
 }
