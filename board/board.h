@@ -47,7 +47,7 @@
 #define GPIOB_EN1 10
 #define GPIOB_EN2 11
 #define GPIOB_EN3 12
-
+#define GPIOC_RESET 14
 /*
  * I/O ports initial setup, this configuration is established soon after reset
  * in the initialization code.
@@ -103,9 +103,10 @@
 /*
  * Port C setup.
  * Everything input with pull-up except:
+ * PC14 reset
  */
 #define VAL_GPIOCCRL            0x88888888      /*  PC7...PC0 */
-#define VAL_GPIOCCRH            0x88888888      /* PC15...PC8 */
+#define VAL_GPIOCCRH            0x82888888      /* PC15...PC8 */
 #define VAL_GPIOCODR            0xFFFFFFFF
 
 /*
