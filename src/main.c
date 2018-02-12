@@ -3,6 +3,14 @@
 #include <math.h>
 
 #include "canard.h"
+#include "canard_stm32.h"
+
+static const CanardSTM32CANTimings can_timings = {
+  1,
+  1,
+  1,
+  1
+};
 
 /*
  * standard 9600 baud serial config.
@@ -26,19 +34,19 @@ static const SPIConfig ls_spicfg = {
 };
 
 static const PWMConfig pwm_cfg = {
-    72000000,                                 /* 72MHz PWM clock frequency.   */
-  10000,                                    /* PWM frequency 7.2kHz      */
-//    10000000,                           // 10MHz PWM clock frequency
-//    1000,                               // PWM period (in ticks) == 10kHz
-    NULL,                               // No Callback
-    {
-        {PWM_OUTPUT_ACTIVE_HIGH, NULL}, /* Enable Channel 0 */
-        {PWM_OUTPUT_ACTIVE_HIGH, NULL}, /* Enable Channel 1 */
-        {PWM_OUTPUT_ACTIVE_HIGH, NULL}, /* Enable Channel 3 */
-        {PWM_OUTPUT_DISABLED, NULL}
-    },
-    0,                                  /* HW dependent part.*/
-    0
+  72000000,                           /* 72MHz PWM clock frequency.   */
+  10000,                              /* PWM frequency 7.2kHz      */
+//    10000000,                       // 10MHz PWM clock frequency
+//    1000,                           // PWM period (in ticks) == 10kHz
+  NULL,                               // No Callback
+  {
+    {PWM_OUTPUT_ACTIVE_HIGH, NULL}, /* Enable Channel 0 */
+    {PWM_OUTPUT_ACTIVE_HIGH, NULL}, /* Enable Channel 1 */
+    {PWM_OUTPUT_ACTIVE_HIGH, NULL}, /* Enable Channel 3 */
+    {PWM_OUTPUT_DISABLED, NULL}
+  },
+  0,                                  /* HW dependent part.*/
+  0
 };
 
 static THD_WORKING_AREA(waThread1, 128);
@@ -89,12 +97,7 @@ void Thread2(void) {
 static THD_WORKING_AREA(waThread3, 128);
 void Thread3(void) {
   chRegSetThreadName("motor");
-/*
-  const int pwm_sin[]={511,444,379,315,256,200,150,106,68,39,17,4,0,4,17,39,68,106,150,200,256,315,379,444,511,578,643,707,767,822,872,916,954,983,1005,1018,1022,1018,1005,983,954,916,872,822,767,707,643,578,511};
-  uint8_t step_A = 0;
-  uint8_t step_B = 16;
-  uint8_t step_C = 32;
-*/
+
   palSetPad(GPIOB, GPIOB_EN1);
   palSetPad(GPIOB, GPIOB_EN2);
   palSetPad(GPIOB, GPIOB_EN3);
@@ -112,25 +115,16 @@ void Thread3(void) {
         } else {
           angle = 0;
         }
-        chThdSleepMicroseconds(5);
+        chThdSleepMicroseconds(1);
     }
-/*        
-  while(1) {
-    step_A++;
-    step_B++;
-    step_C++;
+}
 
-    if (step_A > 47) step_A = 0;
-    if (step_B > 47) step_B = 0;
-    if (step_C > 47) step_C = 0;
+static bool shouldAcceptTransfer(const CanardInstance* a, uint64_t* b, uint16_t c, CanardTransferType d, uint8_t e) {
+  return false;
+}
 
-    pwmEnableChannel(&PWMD3, 0, pwm_sin[step_A]);
-    pwmEnableChannel(&PWMD3, 1, pwm_sin[step_B]);
-    pwmEnableChannel(&PWMD3, 2, pwm_sin[step_C]);
-
-    chThdSleepMilliseconds(10);
-
-  }*/
+static void onTransferReceived(CanardInstance* a, CanardRxTransfer* b) {
+  //
 }
 
 int main(void) {
@@ -143,6 +137,12 @@ int main(void) {
   sdStart(&SD1, &serialCfg);
   pwmStart(&PWMD3, &pwm_cfg);
   PWMD3.tim->CR1 |= STM32_TIM_CR1_CMS(1); //Set Center aligned mode
+
+  canardSTM32Init(&can_timings, CanardSTM32IfaceModeNormal);
+  uint8_t memory_pool[1024];
+  CanardInstance ins;
+  canardInit(&ins, memory_pool, sizeof(memory_pool), &onTransferReceived, &shouldAcceptTransfer, NULL);
+  static const uint8_t PreferredNodeID = CANARD_BROADCAST_NODE_ID;
 
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, (tfunc_t)Thread1, NULL);
   chThdCreateStatic(waThread2, sizeof(waThread2), NORMALPRIO, (tfunc_t)Thread2, NULL);
