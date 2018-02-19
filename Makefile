@@ -171,7 +171,7 @@ CPPC = $(TRGT)g++
 # Enable loading with g++ only if you need C++ runtime support.
 # NOTE: You can use C++ even without C++ support if you are careful. C++
 #       runtime support makes code size explode.
-LD   = $(TRGT)gcc -specs=nosys.specs 
+LD   = $(TRGT)gcc -specs=nosys.specs
 #LD   = $(TRGT)g++
 CP   = $(TRGT)objcopy
 AS   = $(TRGT)gcc -x assembler-with-cpp
@@ -201,22 +201,22 @@ CPPWARN = -Wall -Wextra -Wundef
 # Start of user section
 #
 
-UDEFS += -DUAVCAN_STM32_CHIBIOS=1      \ # Assuming ChibiOS for this example
-         -DUAVCAN_STM32_TIMER_NUMBER=6 \ # Any suitable timer number
-         -DUAVCAN_STM32_NUM_IFACES=1     # Number of CAN interfaces to use (1 - use only CAN1; 2 - both CAN1 and CAN2)
+#UDEFS += -DUAVCAN_STM32_CHIBIOS=1      \ # Assuming ChibiOS for this example
+#         -DUAVCAN_STM32_TIMER_NUMBER=6 \ # Any suitable timer number
+#         -DUAVCAN_STM32_NUM_IFACES=1     # Number of CAN interfaces to use (1 - use only CAN1; 2 - both CAN1 and CAN2)
 
-CSRC += $(wildcard modules/libcanard/*.c)
-CSRC += $(wildcard modules/libcanard/drivers/stm32/*.c)
+#CSRC += $(wildcard modules/libcanard/*.c)
+#CSRC += $(wildcard modules/libcanard/drivers/stm32/*.c)
 
 # List all user C define here, like -D_DEBUG=1
-UDEFS = 
+#UDEFS =
 
 # Define ASM defines here
-UADEFS =
+#UADEFS =
 
 # List all user directories here
-UINCDIR += modules/libcanard/
-UINCDIR += modules/libcanard/drivers/stm32/
+#UINCDIR += modules/libcanard/
+#UINCDIR += modules/libcanard/drivers/stm32/
 
 # List the user directory to look for the libraries here
 ULIBDIR =
