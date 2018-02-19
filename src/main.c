@@ -2,16 +2,6 @@
 #include "hal.h"
 #include <math.h>
 
-#include "canard.h"
-#include "canard_stm32.h"
-
-static const CanardSTM32CANTimings can_timings = {
-  1,
-  1,
-  1,
-  1
-};
-
 /*
  * standard 9600 baud serial config.
  */
@@ -119,14 +109,6 @@ void Thread3(void) {
     }
 }
 
-static bool shouldAcceptTransfer(const CanardInstance* a, uint64_t* b, uint16_t c, CanardTransferType d, uint8_t e) {
-  return false;
-}
-
-static void onTransferReceived(CanardInstance* a, CanardRxTransfer* b) {
-  //
-}
-
 int main(void) {
   halInit();
 
@@ -137,12 +119,6 @@ int main(void) {
   sdStart(&SD1, &serialCfg);
   pwmStart(&PWMD3, &pwm_cfg);
   PWMD3.tim->CR1 |= STM32_TIM_CR1_CMS(1); //Set Center aligned mode
-
-  canardSTM32Init(&can_timings, CanardSTM32IfaceModeNormal);
-  uint8_t memory_pool[1024];
-  CanardInstance ins;
-  canardInit(&ins, memory_pool, sizeof(memory_pool), &onTransferReceived, &shouldAcceptTransfer, NULL);
-  static const uint8_t PreferredNodeID = CANARD_BROADCAST_NODE_ID;
 
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, (tfunc_t)Thread1, NULL);
   chThdCreateStatic(waThread2, sizeof(waThread2), NORMALPRIO, (tfunc_t)Thread2, NULL);
