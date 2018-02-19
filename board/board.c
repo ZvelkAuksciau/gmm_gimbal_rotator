@@ -61,7 +61,9 @@ bool mmc_lld_is_write_protected(MMCDriver *mmcp) {
  * Board-specific initialization code.
  */
 void boardInit(void) {
-  AFIO->MAPR |= AFIO_MAPR_TIM2_REMAP;
-  AFIO->MAPR |= AFIO_MAPR_CAN_REMAP_REMAP2;
+  //AFIO->MAPR |= AFIO_MAPR_TIM2_REMAP;
+  AFIO->MAPR |= AFIO_MAPR_CAN_REMAP_REMAP2; //CAN1 PB8 and PB9
+  AFIO->MAPR |= AFIO_MAPR_SWJ_CFG_0; // configure PB4 pin to be used as PWM output instead of JTAG
+  AFIO->MAPR |= AFIO_MAPR_TIM3_REMAP_PARTIALREMAP; // configure alternate mode for PWM
 
 }
