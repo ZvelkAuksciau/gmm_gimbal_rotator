@@ -29,13 +29,17 @@ void uavcanNodeThread::configureNodeInfo() {
     //TODO: fill board UUID
 
     getNode().setHardwareVersion(hwver);
+    getNode().setNodeID(10);
 }
 void uavcanNodeThread::main() {
+    Node::init();
+
     configureNodeInfo();
 
     const int node_init_res = getNode().start();
     if(node_init_res < 0) {
         //TODO: add board die
+        chSysHalt("UAVCAN init fail");
     }
 
     uavcan::Publisher<uavcan::protocol::debug::KeyValue> kv_pub(getNode());
@@ -45,9 +49,9 @@ void uavcanNodeThread::main() {
     getNode().setModeOperational();
     while(true) {
         const int spin_res = getNode().spin(uavcan::MonotonicDuration::fromMSec(1000));
-       // if(spin_res < 0) {
-            //TODO: log spin failure
-       // }
+        if(spin_res < 0) {
+            chSysHalt("UAVCAN spin failure");//TODO: log spin failure
+       }
 
           kv_pub.broadcast(kv_msg);
         //TODO: log board status

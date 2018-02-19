@@ -5,8 +5,8 @@
 
 # Compiler options here.
 ifeq ($(USE_OPT),)
-  USE_OPT = -Os -fomit-frame-pointer -falign-functions=16
-  #USE_OPT += -nodefaultlibs
+  USE_OPT = -O1 -ggdb -fomit-frame-pointer -falign-functions=16
+ # USE_OPT += -nodefaultlibs
 endif
 
 # C specific options here (added to USE_OPT).
@@ -53,7 +53,7 @@ endif
 #
 # Build global options
 ##############################################################################
-USE_CPPOPT += -std=c++11 #-fno-rtti -fno-exceptions -fno-threadsafe-statics
+USE_CPPOPT += -std=c++11 -fno-rtti -fno-exceptions -fno-threadsafe-statics
 USE_COPT += -std=c99
 
 ##############################################################################
@@ -124,7 +124,8 @@ CPPSRC += $(shell find src -type f -name '*.cpp')
 UDEFS += -DUAVCAN_STM32_CHIBIOS=1 \
 		 -DUAVCAN_STM32_TIMER_NUMBER=2 \
 		 -DUAVCAN_STM32_NUM_IFACES=1 \
-		 -DUAVCAN_CPP_VERSION=UAVCAN_CPP11
+		 -DUAVCAN_CPP_VERSION=UAVCAN_CPP11 \
+		 -DUAVCAN_TINY=0
 		 
 include $(UAVCAN)/libuavcan/include.mk
 CPPSRC += $(LIBUAVCAN_SRC)

@@ -116,10 +116,6 @@ static Node::uavcanNodeThread canNode;
 
 int main(void) {
   halInit();
-  
-  AFIO->MAPR |= AFIO_MAPR_SWJ_CFG_0; // configure PB4 pin to be used as PWM output instead of JTAG
-  AFIO->MAPR |= AFIO_MAPR_TIM3_REMAP_PARTIALREMAP; // configure alternate mode for PWM
-
   chSysInit();
   sdStart(&SD1, &serialCfg);
   pwmStart(&PWMD3, &pwm_cfg);
@@ -128,8 +124,8 @@ int main(void) {
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, (tfunc_t)Thread1, NULL);
   //chThdCreateStatic(waThread2, sizeof(waThread2), NORMALPRIO, (tfunc_t)Thread2, NULL);
   //chThdCreateStatic(waThread3, sizeof(waThread3), NORMALPRIO, (tfunc_t)Thread3, NULL);
-  Node::init();
-  canNode.start(LOWPRIO);
+
+  canNode.start(HIGHPRIO);
   
   while(1) {
     chThdSleepMilliseconds(500);
