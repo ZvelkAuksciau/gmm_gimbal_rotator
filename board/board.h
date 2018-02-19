@@ -97,7 +97,7 @@
  * PB11 - Input with pull up   (USART3_RX).
  */
 #define VAL_GPIOBCRL            0x88BB822B      /*  PB7...PB0 */
-#define VAL_GPIOBCRH            0x88822288      /* PB15...PB8 */
+#define VAL_GPIOBCRH            0x888222B8      /* PB15...PB8 */
 #define VAL_GPIOBODR            0xFFFFFFFF
 
 /*

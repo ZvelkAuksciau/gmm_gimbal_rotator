@@ -5,12 +5,13 @@
 
 # Compiler options here.
 ifeq ($(USE_OPT),)
-  USE_OPT = -O2 -ggdb -fomit-frame-pointer -falign-functions=16 -std=c11
+  USE_OPT = -Os -fomit-frame-pointer -falign-functions=16
+  #USE_OPT += -nodefaultlibs
 endif
 
 # C specific options here (added to USE_OPT).
 ifeq ($(USE_COPT),)
-  USE_COPT =
+  USE_COPT = 
 endif
 
 # C++ specific options here (added to USE_OPT).
@@ -25,7 +26,7 @@ endif
 
 # Linker extra options here.
 ifeq ($(USE_LDOPT),)
-  USE_LDOPT =
+  USE_LDOPT = 
 endif
 
 # Enable this if you want link time optimizations (LTO)
@@ -52,6 +53,8 @@ endif
 #
 # Build global options
 ##############################################################################
+USE_CPPOPT += -std=c++11 #-fno-rtti -fno-exceptions -fno-threadsafe-statics
+USE_COPT += -std=c99
 
 ##############################################################################
 # Architecture or project specific options
@@ -83,27 +86,24 @@ endif
 #
 
 # Define project name here
-PROJECT = gimb_ctrl
-
-BUILDDIR = build
+PROJECT = gcm_firmware
 
 # Imported source files and paths
 CHIBIOS = modules/ChibiOS
+UAVCAN = modules/libuavcan
 # Startup files.
 include $(CHIBIOS)/os/common/startup/ARMCMx/compilers/GCC/mk/startup_stm32f1xx.mk
 # HAL-OSAL files (optional).
 include $(CHIBIOS)/os/hal/hal.mk
 include $(CHIBIOS)/os/hal/ports/STM32/STM32F1xx/platform.mk
-include board/board.mk
 include $(CHIBIOS)/os/hal/osal/rt/osal.mk
 # RTOS files (optional).
 include $(CHIBIOS)/os/rt/rt.mk
 include $(CHIBIOS)/os/common/ports/ARMCMx/compilers/GCC/mk/port_v7m.mk
-# Other files (optional).
-#include $(CHIBIOS)/test/rt/test.mk
+include $(CHIBIOS)/os/various/cpp_wrappers/chcpp.mk
 
 # Define linker script file here
-LDSCRIPT= $(STARTUPLD)/STM32F103x8.ld
+LDSCRIPT= $(STARTUPLD)/STM32F103xB.ld
 
 # C sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
@@ -113,16 +113,30 @@ CSRC = $(STARTUPSRC) \
        $(OSALSRC) \
        $(HALSRC) \
        $(PLATFORMSRC) \
-       $(BOARDSRC) \
-       $(CHIBIOS)/os/hal/lib/streams/chprintf.c
-
-CSRC += $(wildcard src/*.c)	    \
-		$(wildcard src/*/*.c)	\
-		$(wildcard src/*/*/*.c)
+       $(CHIBIOS)/os/various/syscalls.c \
+       board/board.c
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
-CPPSRC = #$(wildcard src/*.cpp)
+CPPSRC += $(CHCPPSRC)
+CPPSRC += $(shell find src -type f -name '*.cpp')
+		 
+UDEFS += -DUAVCAN_STM32_CHIBIOS=1 \
+		 -DUAVCAN_STM32_TIMER_NUMBER=2 \
+		 -DUAVCAN_STM32_NUM_IFACES=1 \
+		 -DUAVCAN_CPP_VERSION=UAVCAN_CPP11
+		 
+include $(UAVCAN)/libuavcan/include.mk
+CPPSRC += $(LIBUAVCAN_SRC)
+UINCDIR += $(LIBUAVCAN_INC)
+
+include $(UAVCAN)/libuavcan_drivers/stm32/driver/include.mk
+CPPSRC += $(LIBUAVCAN_STM32_SRC)
+UINCDIR += $(LIBUAVCAN_STM32_INC)
+
+# Invoke DSDL compiler and add its default output directory to the include search path
+$(info $(shell python $(LIBUAVCAN_DSDLC) $(UAVCAN_DSDL_DIR)))
+UINCDIR += dsdlc_generated      # This is where the generated headers are stored by default
 
 # C sources to be compiled in ARM mode regardless of the global setting.
 # NOTE: Mixing ARM and THUMB mode enables the -mthumb-interwork compiler
@@ -148,11 +162,14 @@ TCPPSRC =
 ASMSRC =
 ASMXSRC = $(STARTUPASM) $(PORTASM) $(OSALASM)
 
-INCDIR = $(CHIBIOS)/os/license \
+INCDIR = src board $(CHIBIOS)/os/license \
          $(STARTUPINC) $(KERNINC) $(PORTINC) $(OSALINC) \
-         $(HALINC) $(PLATFORMINC) $(BOARDINC) \
-         $(CHIBIOS)/os/various \
-         $(CHIBIOS)/os/hal/lib/streams \
+         $(HALINC) $(PLATFORMINC) $(BOARDINC) $(TESTINC) \
+         $(CHIBIOS)/os/various $(CHCPPINC)
+         
+UINCDIR += src src/sys
+
+
 
 #
 # Project, sources and paths
@@ -171,8 +188,8 @@ CPPC = $(TRGT)g++
 # Enable loading with g++ only if you need C++ runtime support.
 # NOTE: You can use C++ even without C++ support if you are careful. C++
 #       runtime support makes code size explode.
-LD   = $(TRGT)gcc -specs=nosys.specs
-#LD   = $(TRGT)g++
+#LD   = $(TRGT)gcc
+LD   = $(TRGT)g++
 CP   = $(TRGT)objcopy
 AS   = $(TRGT)gcc -x assembler-with-cpp
 AR   = $(TRGT)ar
@@ -201,28 +218,14 @@ CPPWARN = -Wall -Wextra -Wundef
 # Start of user section
 #
 
-#UDEFS += -DUAVCAN_STM32_CHIBIOS=1      \ # Assuming ChibiOS for this example
-#         -DUAVCAN_STM32_TIMER_NUMBER=6 \ # Any suitable timer number
-#         -DUAVCAN_STM32_NUM_IFACES=1     # Number of CAN interfaces to use (1 - use only CAN1; 2 - both CAN1 and CAN2)
-
-#CSRC += $(wildcard modules/libcanard/*.c)
-#CSRC += $(wildcard modules/libcanard/drivers/stm32/*.c)
-
-# List all user C define here, like -D_DEBUG=1
-#UDEFS =
-
 # Define ASM defines here
-#UADEFS =
-
-# List all user directories here
-#UINCDIR += modules/libcanard/
-#UINCDIR += modules/libcanard/drivers/stm32/
+UADEFS =
 
 # List the user directory to look for the libraries here
 ULIBDIR =
 
 # List all user libraries here
-ULIBS = -lm
+ULIBS =
 
 #
 # End of user defines
@@ -230,7 +233,4 @@ ULIBS = -lm
 
 RULESPATH = $(CHIBIOS)/os/common/startup/ARMCMx/compilers/GCC
 include $(RULESPATH)/rules.mk
-
-program:
-	st-flash write build/gimb_ctrl.bin 0x8000000
 
