@@ -4,63 +4,40 @@
 #include <uavcan/protocol/debug/KeyValue.hpp>
 
 #include <ch.hpp>
-#include <hal.h>
 
 namespace Node {
 
-uavcan_stm32::CanInitHelper<> can;
+  uavcan_stm32::CanInitHelper<> can;
 
-uavcan::Node<NodePoolSize>& getNode() {
+  uavcan::Node<NodePoolSize>& getNode() {
     static uavcan::Node<NodePoolSize> node(can.driver, uavcan_stm32::SystemClock::instance());
     return node;
-}
+  }
 
-void uavcanNodeThread::configureNodeInfo() {
+  void uavcanNodeThread::main() {
+    uavcan::uint32_t bitrate = 1000000;
+    can.init(bitrate);
+
     getNode().setName("org.kmti.gmm_controler");
-
-    uavcan::protocol::SoftwareVersion swver;
-
-    swver.vcs_commit = 0; //TODO: add git hash
-    swver.optional_field_flags = swver.OPTIONAL_FIELD_FLAG_VCS_COMMIT;
-
-    getNode().setSoftwareVersion(swver);
-
-    uavcan::protocol::HardwareVersion hwver;
-    //TODO: fill board UUID
-
-    getNode().setHardwareVersion(hwver);
     getNode().setNodeID(10);
-}
-void uavcanNodeThread::main() {
-    Node::init();
 
-    configureNodeInfo();
-
-    const int node_init_res = getNode().start();
-    if(node_init_res < 0) {
-        //TODO: add board die
-        chSysHalt("UAVCAN init fail");
+    if (getNode().start() < 0) {
+      chSysHalt("UAVCAN init fail");
     }
 
     uavcan::Publisher<uavcan::protocol::debug::KeyValue> kv_pub(getNode());
     kv_pub.init();
-    uavcan::protocol::debug::KeyValue kv_msg;  // Always zero initialized
+    uavcan::protocol::debug::KeyValue kv_msg;
 
     getNode().setModeOperational();
+
     while(true) {
-        const int spin_res = getNode().spin(uavcan::MonotonicDuration::fromMSec(1000));
-        if(spin_res < 0) {
-            chSysHalt("UAVCAN spin failure");//TODO: log spin failure
-       }
-
-          kv_pub.broadcast(kv_msg);
-        //TODO: log board status
+      if (getNode().spin(uavcan::MonotonicDuration::fromMSec(1000)) < 0) {
+        chSysHalt("UAVCAN spin fail");
+      }
+        kv_pub.broadcast(kv_msg);
     }
-}
-
-void init() {
-    uavcan::uint32_t bitrate = 1000000;
-    can.init(bitrate);
-}
+  }
 
 }
+

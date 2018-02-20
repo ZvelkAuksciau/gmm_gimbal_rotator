@@ -1,23 +1,20 @@
-#ifndef GCM_FIRMWARE_SRC_NODE_HPP_
-#define GCM_FIRMWARE_SRC_NODE_HPP_
+#ifndef NODE_HPP
+#define NODE_HPP
 
 #include <uavcan/uavcan.hpp>
 #include <ch.hpp>
 
 namespace Node {
 
-class uavcanNodeThread : public chibios_rt::BaseStaticThread<4000> {
-    void configureNodeInfo();
-public:
-    void main();
+  constexpr unsigned NodePoolSize = 400;
+  uavcan::Node<NodePoolSize>& getNode();
 
-};
-
-constexpr unsigned NodePoolSize = 400;
-uavcan::Node<NodePoolSize>& getNode();
-void init();
+  class uavcanNodeThread : public chibios_rt::BaseStaticThread<4000> {
+    public:
+      void main();
+  };
 
 }
 
+#endif
 
-#endif /* GCM_FIRMWARE_SRC_NODE_HPP_ */
