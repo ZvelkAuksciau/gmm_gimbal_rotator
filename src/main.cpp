@@ -105,9 +105,9 @@ void Thread3(void) {
     float angle = 0;
     while (TRUE) {
         if(angle < 6.28) {
-            pwmEnableChannel(&PWMD3, 2, (half_pwr + half_pwr * sinf(angle)) / 2);
-            pwmEnableChannel(&PWMD3, 1, (half_pwr + half_pwr * sinf(angle - 2.094)) / 2);
-            pwmEnableChannel(&PWMD3, 0, (half_pwr + half_pwr * sinf(angle + 2.094)) / 2);
+            pwmEnableChannel(&PWMD3, 2, (half_pwr + half_pwr * sinf(angle)));
+            pwmEnableChannel(&PWMD3, 1, (half_pwr + half_pwr * sinf(angle - 2.094)));
+            pwmEnableChannel(&PWMD3, 0, (half_pwr + half_pwr * sinf(angle + 2.094)));
             angle += 0.1f;
         } else {
           angle = 0;
