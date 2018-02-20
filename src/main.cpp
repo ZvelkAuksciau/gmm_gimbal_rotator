@@ -4,6 +4,12 @@
 
 #include "node.hpp"
 
+static const GPTConfig gpt4cfg = {
+  100000, // 1 MHz timer clock.
+  NULL, // No callback
+  0, 0
+};
+
 /*
  * standard 9600 baud serial config.
  */
@@ -26,18 +32,16 @@ static const SPIConfig ls_spicfg = {
 };
 
 static const PWMConfig pwm_cfg = {
-  72000000,                           /* 72MHz PWM clock frequency.   */
-  10000,                              /* PWM frequency 7.2kHz      */
-//    10000000,                       // 10MHz PWM clock frequency
-//    1000,                           // PWM period (in ticks) == 10kHz
-  NULL,                               // No Callback
+  72000000,                         // 72 MHz PWM clock frequency
+  1500,                             // 24 kHz PWM frequency
+  NULL,                             // No Callback
   {
-    {PWM_OUTPUT_ACTIVE_HIGH, NULL}, /* Enable Channel 0 */
-    {PWM_OUTPUT_ACTIVE_HIGH, NULL}, /* Enable Channel 1 */
-    {PWM_OUTPUT_ACTIVE_HIGH, NULL}, /* Enable Channel 3 */
+    {PWM_OUTPUT_ACTIVE_HIGH, NULL},
+    {PWM_OUTPUT_ACTIVE_HIGH, NULL},
+    {PWM_OUTPUT_ACTIVE_HIGH, NULL},
     {PWM_OUTPUT_DISABLED, NULL}
   },
-  0,                                  /* HW dependent part.*/
+  0,
   0
 };
 
@@ -97,18 +101,19 @@ void Thread3(void) {
   //palSetPad(GPIOC, GPIOC_RESET);
   //chThdSleepMilliseconds(50);
   //palClearPad(GPIOC, GPIOC_RESET);
-  float half_pwr = 7200;
+  float half_pwr = 750;
     float angle = 0;
     while (TRUE) {
         if(angle < 6.28) {
-            pwmEnableChannel(&PWMD3, 2, half_pwr + half_pwr * sinf(angle));
-            pwmEnableChannel(&PWMD3, 1, half_pwr + half_pwr * sinf(angle - 2.094));
-            pwmEnableChannel(&PWMD3, 0, half_pwr + half_pwr * sinf(angle + 2.094));
+            pwmEnableChannel(&PWMD3, 2, (half_pwr + half_pwr * sinf(angle)) / 2);
+            pwmEnableChannel(&PWMD3, 1, (half_pwr + half_pwr * sinf(angle - 2.094)) / 2);
+            pwmEnableChannel(&PWMD3, 0, (half_pwr + half_pwr * sinf(angle + 2.094)) / 2);
             angle += 0.1f;
         } else {
           angle = 0;
         }
-        chThdSleepMicroseconds(1);
+
+        chThdSleepMilliseconds(1);
     }
 }
 
