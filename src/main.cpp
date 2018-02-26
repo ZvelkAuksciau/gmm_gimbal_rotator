@@ -2,13 +2,9 @@
 #include <hal.h>
 #include <math.h>
 
-#include "node.hpp"
-
-static const GPTConfig gpt4cfg = {
-  100000, // 1 MHz timer clock.
-  NULL, // No callback
-  0, 0
-};
+#include <uavcan/uavcan.hpp>
+#include <uavcan_stm32/uavcan_stm32.hpp>
+#include <kmti/gimbal/MotorCOmmand.hpp>
 
 /*
  * standard 9600 baud serial config.
@@ -78,6 +74,8 @@ void Thread2(void) {
   while(1) {
     chThdSleepMilliseconds(500);
 
+    volatile systime_t time = chVTGetSystemTime();
+
     spiAcquireBus(&SPID1);
     spiStart(&SPID1, &ls_spicfg);
     spiSelect(&SPID1);
@@ -85,55 +83,108 @@ void Thread2(void) {
     spiUnselect(&SPID1);
 
     spiReleaseBus(&SPID1);
+
+    time = chVTGetSystemTime() - time;
     sdWrite(&SD1, &buf1[0], 4);
     sdWrite(&SD1, &spi_rx_buf[0], 2);
     sdWrite(&SD1, &buf2[0], 2);
+
+
   }
 }
 
-static THD_WORKING_AREA(waThread3, 128);
-void Thread3(void) {
-  chRegSetThreadName("motor");
+//static THD_WORKING_AREA(waThread3, 128);
+//void Thread3(void) {
+//  chRegSetThreadName("motor");
+//
+//  float half_pwr = 750;
+//    float angle = 0;
+//    while (TRUE) {
+//        if(angle < 6.28) {
+//            pwmEnableChannel(&PWMD3, 2, (half_pwr + half_pwr * sinf(angle)));
+//            pwmEnableChannel(&PWMD3, 1, (half_pwr + half_pwr * sinf(angle - 2.094)));
+//            pwmEnableChannel(&PWMD3, 0, (half_pwr + half_pwr * sinf(angle + 2.094)));
+//            angle += 0.1f;
+//        } else {
+//          angle = 0;
+//        }
+//
+//        chThdSleepMilliseconds(1);
+//    }
+//}
 
-  palSetPad(GPIOB, GPIOB_EN1);
-  palSetPad(GPIOB, GPIOB_EN2);
-  palSetPad(GPIOB, GPIOB_EN3);
-  //palSetPad(GPIOC, GPIOC_RESET);
-  //chThdSleepMilliseconds(50);
-  //palClearPad(GPIOC, GPIOC_RESET);
-  float half_pwr = 750;
-    float angle = 0;
-    while (TRUE) {
-        if(angle < 6.28) {
-            pwmEnableChannel(&PWMD3, 2, (half_pwr + half_pwr * sinf(angle)));
-            pwmEnableChannel(&PWMD3, 1, (half_pwr + half_pwr * sinf(angle - 2.094)));
-            pwmEnableChannel(&PWMD3, 0, (half_pwr + half_pwr * sinf(angle + 2.094)));
-            angle += 0.1f;
-        } else {
-          angle = 0;
-        }
+uavcan_stm32::CanInitHelper<> can;
+constexpr unsigned NodePoolSize = 2000;
 
-        chThdSleepMilliseconds(1);
-    }
+uavcan::Node<NodePoolSize>& getNode() {
+  static uavcan::Node<NodePoolSize> node(can.driver, uavcan_stm32::SystemClock::instance());
+  return node;
 }
 
-static Node::uavcanNodeThread canNode;
+//Pitch 0;Roll 1 ;Yaw 2
+#define AXIS 0
+#define HALF_POWER 750
 
 int main(void) {
   halInit();
   chSysInit();
+
+  palClearPad(GPIOB, GPIOB_EN1);
+  palClearPad(GPIOB, GPIOB_EN2);
+  palClearPad(GPIOB, GPIOB_EN3);
+
   sdStart(&SD1, &serialCfg);
   pwmStart(&PWMD3, &pwm_cfg);
   PWMD3.tim->CR1 |= STM32_TIM_CR1_CMS(1); //Set Center aligned mode
 
+
+  uavcan::uint32_t bitrate = 1000000;
+  can.init(bitrate);
+
+  getNode().setName("org.kmti.gmm_controler");
+  getNode().setNodeID(12);
+
+  if (getNode().start() < 0) {
+    chSysHalt("UAVCAN init fail");
+  }
+
+  uavcan::Subscriber<kmti::gimbal::MotorCommand> mot_sub(getNode());
+
+  const int mot_sub_start_res = mot_sub.start(
+          [&](const uavcan::ReceivedDataStructure<kmti::gimbal::MotorCommand>& msg)
+          {
+              if(msg.power[AXIS] <= 0) {
+                  palClearPad(GPIOB, GPIOB_EN1);
+                  palClearPad(GPIOB, GPIOB_EN2);
+                  palClearPad(GPIOB, GPIOB_EN3);
+                  pwmDisableChannel(&PWMD3, 0);
+                  pwmDisableChannel(&PWMD3, 1);
+                  pwmDisableChannel(&PWMD3, 2);
+              } else {
+                  float cmd = msg.cmd[AXIS];
+                  float power = HALF_POWER * msg.power[AXIS];
+                  palSetPad(GPIOB, GPIOB_EN1);
+                  palSetPad(GPIOB, GPIOB_EN2);
+                  palSetPad(GPIOB, GPIOB_EN3);
+                  pwmEnableChannel(&PWMD3, 2, (HALF_POWER + power * sinf(cmd)));
+                  pwmEnableChannel(&PWMD3, 1, (HALF_POWER + power * sinf(cmd - 2.094)));
+                  pwmEnableChannel(&PWMD3, 0, (HALF_POWER + power * sinf(cmd + 2.094)));
+              }
+          });
+
+  if(mot_sub_start_res < 0) {
+      chSysHalt("Failed to start subscriber");
+  }
+
+  getNode().setModeOperational();
+
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, (tfunc_t)Thread1, NULL);
   chThdCreateStatic(waThread2, sizeof(waThread2), NORMALPRIO, (tfunc_t)Thread2, NULL);
-  chThdCreateStatic(waThread3, sizeof(waThread3), NORMALPRIO, (tfunc_t)Thread3, NULL);
-
-  canNode.start(HIGHPRIO);
 
   while(1) {
-    chThdSleepMilliseconds(500);
+      if(getNode().spin(uavcan::MonotonicDuration::fromMSec(1000)) < 0){
+          chSysHalt("Spin fail");
+      }
   }
 }
 
