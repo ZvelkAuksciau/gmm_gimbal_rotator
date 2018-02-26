@@ -125,6 +125,17 @@ uavcan::Node<NodePoolSize>& getNode() {
 #define AXIS 0
 #define HALF_POWER 750
 
+void disableOutput() {
+    palClearPad(GPIOB, GPIOB_EN1);
+    palClearPad(GPIOB, GPIOB_EN2);
+    palClearPad(GPIOB, GPIOB_EN3);
+    pwmDisableChannel(&PWMD3, 0);
+    pwmDisableChannel(&PWMD3, 1);
+    pwmDisableChannel(&PWMD3, 2);
+}
+
+systime_t lastCommandTime = 0;
+
 int main(void) {
   halInit();
   chSysInit();
@@ -154,12 +165,7 @@ int main(void) {
           [&](const uavcan::ReceivedDataStructure<kmti::gimbal::MotorCommand>& msg)
           {
               if(msg.power[AXIS] <= 0) {
-                  palClearPad(GPIOB, GPIOB_EN1);
-                  palClearPad(GPIOB, GPIOB_EN2);
-                  palClearPad(GPIOB, GPIOB_EN3);
-                  pwmDisableChannel(&PWMD3, 0);
-                  pwmDisableChannel(&PWMD3, 1);
-                  pwmDisableChannel(&PWMD3, 2);
+                  disableOutput();
               } else {
                   float cmd = msg.cmd[AXIS];
                   float power = HALF_POWER * msg.power[AXIS];
@@ -170,6 +176,7 @@ int main(void) {
                   pwmEnableChannel(&PWMD3, 1, (HALF_POWER + power * sinf(cmd - 2.094)));
                   pwmEnableChannel(&PWMD3, 0, (HALF_POWER + power * sinf(cmd + 2.094)));
               }
+              lastCommandTime = chVTGetSystemTime();
           });
 
   if(mot_sub_start_res < 0) {
@@ -182,8 +189,11 @@ int main(void) {
   chThdCreateStatic(waThread2, sizeof(waThread2), NORMALPRIO, (tfunc_t)Thread2, NULL);
 
   while(1) {
-      if(getNode().spin(uavcan::MonotonicDuration::fromMSec(1000)) < 0){
-          chSysHalt("Spin fail");
+      if(getNode().spin(uavcan::MonotonicDuration::fromMSec(100)) < 0){
+      }
+      if(lastCommandTime != 0 && lastCommandTime + MS2ST(500) < chVTGetSystemTime()) {
+          lastCommandTime = 0;
+          disableOutput();
       }
   }
 }
