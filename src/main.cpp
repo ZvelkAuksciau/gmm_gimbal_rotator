@@ -4,7 +4,8 @@
 
 #include <uavcan/uavcan.hpp>
 #include <uavcan_stm32/uavcan_stm32.hpp>
-#include <kmti/gimbal/MotorCOmmand.hpp>
+#include <kmti/gimbal/MotorCommand.hpp>
+#include <kmti/gimbal/MotorStatus.hpp>
 
 /*
  * standard 9600 baud serial config.
@@ -148,6 +149,8 @@ int main(void) {
   pwmStart(&PWMD3, &pwm_cfg);
   PWMD3.tim->CR1 |= STM32_TIM_CR1_CMS(1); //Set Center aligned mode
 
+  const uint8_t AS5048A_ANGLE[2] = {0xFF, 0xFF};
+  static uint8_t spi_rx_buf[2];
 
   uavcan::uint32_t bitrate = 1000000;
   can.init(bitrate);
@@ -172,9 +175,15 @@ int main(void) {
                   palSetPad(GPIOB, GPIOB_EN1);
                   palSetPad(GPIOB, GPIOB_EN2);
                   palSetPad(GPIOB, GPIOB_EN3);
-                  pwmEnableChannel(&PWMD3, 2, (HALF_POWER + power * sinf(cmd)));
-                  pwmEnableChannel(&PWMD3, 1, (HALF_POWER + power * sinf(cmd - 2.094)));
-                  pwmEnableChannel(&PWMD3, 0, (HALF_POWER + power * sinf(cmd + 2.094)));
+                  if(msg.power[AXIS] > 0) {
+                      pwmEnableChannel(&PWMD3, 2, (HALF_POWER + power * sinf(cmd)));
+                      pwmEnableChannel(&PWMD3, 1, (HALF_POWER + power * sinf(cmd - 2.094)));
+                      pwmEnableChannel(&PWMD3, 0, (HALF_POWER + power * sinf(cmd + 2.094)));
+                  } else { //Change 2 phases over
+                      pwmEnableChannel(&PWMD3, 1, (HALF_POWER + power * sinf(cmd)));
+                      pwmEnableChannel(&PWMD3, 2, (HALF_POWER + power * sinf(cmd - 2.094)));
+                      pwmEnableChannel(&PWMD3, 0, (HALF_POWER + power * sinf(cmd + 2.094)));
+                  }
               }
               lastCommandTime = chVTGetSystemTime();
           });
@@ -183,18 +192,35 @@ int main(void) {
       chSysHalt("Failed to start subscriber");
   }
 
+  uavcan::Publisher<kmti::gimbal::MotorStatus> status_pub(getNode());
+  status_pub.init();
+  kmti::gimbal::MotorStatus status_msg;
+  status_msg.axis_id = AXIS;
+
   getNode().setModeOperational();
 
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, (tfunc_t)Thread1, NULL);
   chThdCreateStatic(waThread2, sizeof(waThread2), NORMALPRIO, (tfunc_t)Thread2, NULL);
 
   while(1) {
-      if(getNode().spin(uavcan::MonotonicDuration::fromMSec(100)) < 0){
+      if(getNode().spin(uavcan::MonotonicDuration::fromMSec(10)) < 0){
       }
       if(lastCommandTime != 0 && lastCommandTime + MS2ST(500) < chVTGetSystemTime()) {
           lastCommandTime = 0;
           disableOutput();
       }
+
+      spiAcquireBus(&SPID1);
+      spiStart(&SPID1, &ls_spicfg);
+      spiSelect(&SPID1);
+      spiExchange(&SPID1, 2, AS5048A_ANGLE, &spi_rx_buf);
+      spiUnselect(&SPID1);
+
+      spiReleaseBus(&SPID1);
+      uint16_t mot_pos = spi_rx_buf[0] << 8 & 0x3F00;
+      mot_pos |= spi_rx_buf[1] & 0x00FF;
+      status_msg.motor_pos = mot_pos * 0.00038349519f;
+      status_pub.broadcast(status_msg);
   }
 }
 
