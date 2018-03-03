@@ -123,7 +123,7 @@ uavcan::Node<NodePoolSize>& getNode() {
 }
 
 //Pitch 0;Roll 1 ;Yaw 2
-#define AXIS 0
+#define AXIS 2
 #define HALF_POWER 750
 
 void disableOutput() {
@@ -156,7 +156,7 @@ int main(void) {
   can.init(bitrate);
 
   getNode().setName("org.kmti.gmm_controler");
-  getNode().setNodeID(12);
+  getNode().setNodeID(14);
 
   if (getNode().start() < 0) {
     chSysHalt("UAVCAN init fail");
@@ -167,7 +167,7 @@ int main(void) {
   const int mot_sub_start_res = mot_sub.start(
           [&](const uavcan::ReceivedDataStructure<kmti::gimbal::MotorCommand>& msg)
           {
-              if(msg.power[AXIS] <= 0) {
+              if(msg.power[AXIS] == 0.0f) {
                   disableOutput();
               } else {
                   float cmd = msg.cmd[AXIS];
@@ -180,9 +180,9 @@ int main(void) {
                       pwmEnableChannel(&PWMD3, 1, (HALF_POWER + power * sinf(cmd - 2.094)));
                       pwmEnableChannel(&PWMD3, 0, (HALF_POWER + power * sinf(cmd + 2.094)));
                   } else { //Change 2 phases over
-                      pwmEnableChannel(&PWMD3, 1, (HALF_POWER + power * sinf(cmd)));
-                      pwmEnableChannel(&PWMD3, 2, (HALF_POWER + power * sinf(cmd - 2.094)));
-                      pwmEnableChannel(&PWMD3, 0, (HALF_POWER + power * sinf(cmd + 2.094)));
+                      pwmEnableChannel(&PWMD3, 1, (HALF_POWER - power * sinf(cmd)));
+                      pwmEnableChannel(&PWMD3, 2, (HALF_POWER - power * sinf(cmd - 2.094)));
+                      pwmEnableChannel(&PWMD3, 0, (HALF_POWER - power * sinf(cmd + 2.094)));
                   }
               }
               lastCommandTime = chVTGetSystemTime();
