@@ -32,10 +32,10 @@ namespace Node {
     getNode().setModeOperational();
 
     while(true) {
-      if (getNode().spin(uavcan::MonotonicDuration::fromMSec(1000)) < 0) {
+      if (getNode().spin(uavcan::MonotonicDuration::fromMSec(500)) < 0) {
         chSysHalt("UAVCAN spin fail");
       }
-        kv_pub.broadcast(kv_msg);
+        //kv_pub.broadcast(kv_msg);
     }
   }
 

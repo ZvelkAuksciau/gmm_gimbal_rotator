@@ -2,8 +2,7 @@
 #include <hal.h>
 #include <math.h>
 
-#include <uavcan/uavcan.hpp>
-#include <uavcan_stm32/uavcan_stm32.hpp>
+#include <node.hpp>
 #include <kmti/gimbal/MotorCommand.hpp>
 #include <kmti/gimbal/MotorStatus.hpp>
 
@@ -18,13 +17,13 @@ static const SerialConfig serialCfg = {
 };
 
 /*
- * Low speed SPI configuration (281.250kHz, CPHA=1, CPOL=0, MSb first).
+ * SPI configuration (9MHz, CPHA=1, CPOL=0, MSb first).
  */
-static const SPIConfig ls_spicfg = {
+static const SPIConfig spicfg = {
   NULL,
   GPIOA,
   GPIOA_SPI1NSS,
-  SPI_CR1_BR_2 | SPI_CR1_BR_1 | SPI_CR1_CPHA,
+  SPI_CR1_BR_1 | SPI_CR1_CPHA,
   0
 };
 
@@ -42,6 +41,44 @@ static const PWMConfig pwm_cfg = {
   0
 };
 
+#define BOARD_NORMAL                0x00
+#define BOARD_CALIBRATING_NUM_POLES 0x01
+#define BOARD_CALIBRATING_OFFSET    0x04
+
+#define HALF_POWER 750
+
+uint8_t g_boardStatus = 0;
+float cmd_power = 0.0f;
+
+void disableOutput() {
+    palClearPad(GPIOB, GPIOB_EN1);
+    palClearPad(GPIOB, GPIOB_EN2);
+    palClearPad(GPIOB, GPIOB_EN3);
+    pwmDisableChannel(&PWMD3, 0);
+    pwmDisableChannel(&PWMD3, 1);
+    pwmDisableChannel(&PWMD3, 2);
+}
+
+void enableOutput() {
+  palSetPad(GPIOB, GPIOB_EN1);
+  palSetPad(GPIOB, GPIOB_EN2);
+  palSetPad(GPIOB, GPIOB_EN3);
+}
+
+void setPwmCommand(float cmd, float set_power) {
+  float power = HALF_POWER * set_power;
+  if(set_power >= 0.0f) {
+    pwmEnableChannel(&PWMD3, 2, (HALF_POWER + power * sinf(cmd)));
+    pwmEnableChannel(&PWMD3, 1, (HALF_POWER + power * sinf(cmd - 2.094)));
+    pwmEnableChannel(&PWMD3, 0, (HALF_POWER + power * sinf(cmd + 2.094)));
+  } else {
+    pwmEnableChannel(&PWMD3, 1, (HALF_POWER - power * sinf(cmd)));
+    pwmEnableChannel(&PWMD3, 2, (HALF_POWER - power * sinf(cmd - 2.094)));
+    pwmEnableChannel(&PWMD3, 0, (HALF_POWER - power * sinf(cmd + 2.094)));
+
+  }
+}
+
 static THD_WORKING_AREA(waThread1, 128);
 void Thread1(void) {
   chRegSetThreadName("blinker");
@@ -56,135 +93,127 @@ void Thread1(void) {
   }
 }
 
-static THD_WORKING_AREA(waThread2, 128);
-void Thread2(void) {
+//Running at 5khz
+static THD_WORKING_AREA(waRotoryEncThd, 128);
+void RotoryEncThd(void) {
   chRegSetThreadName("rotary_position_sensor");
-  /*
-  const uint16_t AS5048A_CLEAR_ERROR_FLAG              = 0x0001;
-  const uint16_t AS5048A_PROGRAMMING_CONTROL           = 0x0003;
-  const uint16_t AS5048A_OTP_REGISTER_ZERO_POS_HIGH    = 0x0016;
-  const uint16_t AS5048A_OTP_REGISTER_ZERO_POS_LOW     = 0x0017;
-  const uint16_t AS5048A_DIAG_AGC                      = 0x3FFD;
-  const uint16_t AS5048A_MAGNITUDE                     = 0x3FFE;
-  */
-  const uint8_t AS5048A_ANGLE[2] = {0x3F, 0xFF};
-  const uint8_t buf1[5] = "mag:";
-  const uint8_t buf2[3] = "\r\n";
-  static uint8_t spi_rx_buf[2];
+
+  const uint8_t AS5048A_ANGLE[2] = {0xFF, 0xFF};
+  uint8_t spi_rx_buf[2];
+  uint16_t mot_pos;
+
+  uint8_t g_numPoles = 0;
+  int16_t offset = 0;
+  int8_t reversed = 1;
+
+  enum {
+    GO_TO_ZERO,
+    READ_ZERO_POS,
+    DO_ONE_ROTATION,
+  };
+  uint8_t poleCalibState = GO_TO_ZERO;
+
+  uint32_t zero_pos_avg = 0;
+  uint8_t zero_pos_avg_count = 0;
+  float cmd_angle = 0.0f;
+  bool dir_calibrated = false;
 
   while(1) {
-    chThdSleepMilliseconds(500);
-
-    volatile systime_t time = chVTGetSystemTime();
-
+    systime_t time = chVTGetSystemTime() + US2ST(200);
     spiAcquireBus(&SPID1);
-    spiStart(&SPID1, &ls_spicfg);
+    spiStart(&SPID1, &spicfg);
     spiSelect(&SPID1);
     spiExchange(&SPID1, 2, AS5048A_ANGLE, &spi_rx_buf);
     spiUnselect(&SPID1);
 
     spiReleaseBus(&SPID1);
+    mot_pos = spi_rx_buf[0] << 8 & 0x3F00;
+    mot_pos |= spi_rx_buf[1] & 0x00FF;
 
-    time = chVTGetSystemTime() - time;
-    sdWrite(&SD1, &buf1[0], 4);
-    sdWrite(&SD1, &spi_rx_buf[0], 2);
-    sdWrite(&SD1, &buf2[0], 2);
+    if(g_boardStatus == BOARD_NORMAL) {
+      if(cmd_power > 0.0f) {
+        enableOutput();
+        float command = (int32_t)(mot_pos - zero_pos_avg) * 0.00038349519f * g_numPoles  + reversed * 1.570796f;
+        setPwmCommand(command, cmd_power);
+      } else if(cmd_power < 0.0f) {
+        enableOutput();
+        float command = (int32_t)(mot_pos - zero_pos_avg) * 0.00038349519f * g_numPoles  - reversed * 1.570796f;
+        setPwmCommand(command, -cmd_power);
+      } else {
+        disableOutput();
+      }
+    }
 
-
+    if(g_boardStatus & BOARD_CALIBRATING_NUM_POLES) {
+      switch(poleCalibState){
+      case GO_TO_ZERO:
+        cmd_angle = 0.0f;
+        enableOutput();
+        setPwmCommand(0.0f, 0.3f);
+        chThdSleepMilliseconds(1000);
+        poleCalibState = READ_ZERO_POS;
+        break;
+      case READ_ZERO_POS:
+        zero_pos_avg += mot_pos;
+        zero_pos_avg_count++;
+        if(zero_pos_avg_count == 100) {
+          zero_pos_avg /= zero_pos_avg_count;
+          poleCalibState = DO_ONE_ROTATION;
+        }
+        break;
+      case DO_ONE_ROTATION:
+        cmd_angle += 0.005f;
+        setPwmCommand(cmd_angle, 0.4f);
+        int32_t diff = mot_pos - zero_pos_avg;
+        if(cmd_angle > 1.0f && !dir_calibrated) {
+          if(diff > 0) {
+            reversed = 1;
+            dir_calibrated = true;
+          } else if(diff < 0) {
+            reversed = -1;
+            dir_calibrated = true;
+          }
+        }
+        if(cmd_angle > 3.0f) {
+          if(diff < 100 && diff > -100) {
+            g_boardStatus &= ~BOARD_CALIBRATING_NUM_POLES;
+            poleCalibState = GO_TO_ZERO;
+            g_numPoles = round(cmd_angle/6.2831f);
+          }
+        }
+        break;
+      }
+    }
+    chThdSleepMicroseconds(200);
   }
-}
-
-//static THD_WORKING_AREA(waThread3, 128);
-//void Thread3(void) {
-//  chRegSetThreadName("motor");
-//
-//  float half_pwr = 750;
-//    float angle = 0;
-//    while (TRUE) {
-//        if(angle < 6.28) {
-//            pwmEnableChannel(&PWMD3, 2, (half_pwr + half_pwr * sinf(angle)));
-//            pwmEnableChannel(&PWMD3, 1, (half_pwr + half_pwr * sinf(angle - 2.094)));
-//            pwmEnableChannel(&PWMD3, 0, (half_pwr + half_pwr * sinf(angle + 2.094)));
-//            angle += 0.1f;
-//        } else {
-//          angle = 0;
-//        }
-//
-//        chThdSleepMilliseconds(1);
-//    }
-//}
-
-uavcan_stm32::CanInitHelper<> can;
-constexpr unsigned NodePoolSize = 2000;
-
-uavcan::Node<NodePoolSize>& getNode() {
-  static uavcan::Node<NodePoolSize> node(can.driver, uavcan_stm32::SystemClock::instance());
-  return node;
 }
 
 //Pitch 0;Roll 1 ;Yaw 2
 #define AXIS 2
-#define HALF_POWER 750
-
-void disableOutput() {
-    palClearPad(GPIOB, GPIOB_EN1);
-    palClearPad(GPIOB, GPIOB_EN2);
-    palClearPad(GPIOB, GPIOB_EN3);
-    pwmDisableChannel(&PWMD3, 0);
-    pwmDisableChannel(&PWMD3, 1);
-    pwmDisableChannel(&PWMD3, 2);
-}
 
 systime_t lastCommandTime = 0;
+Node::uavcanNodeThread nodeThd;
 
 int main(void) {
   halInit();
   chSysInit();
 
-  palClearPad(GPIOB, GPIOB_EN1);
-  palClearPad(GPIOB, GPIOB_EN2);
-  palClearPad(GPIOB, GPIOB_EN3);
+  disableOutput();
 
   sdStart(&SD1, &serialCfg);
   pwmStart(&PWMD3, &pwm_cfg);
   PWMD3.tim->CR1 |= STM32_TIM_CR1_CMS(1); //Set Center aligned mode
+  nodeThd.start(NORMALPRIO-1);
 
-  const uint8_t AS5048A_ANGLE[2] = {0xFF, 0xFF};
-  static uint8_t spi_rx_buf[2];
+  g_boardStatus |= BOARD_CALIBRATING_NUM_POLES; //| BOARD_CALIBRATING_OFFSET;
+  chThdSleepMilliseconds(200);
 
-  uavcan::uint32_t bitrate = 1000000;
-  can.init(bitrate);
-
-  getNode().setName("org.kmti.gmm_controler");
-  getNode().setNodeID(14);
-
-  if (getNode().start() < 0) {
-    chSysHalt("UAVCAN init fail");
-  }
-
-  uavcan::Subscriber<kmti::gimbal::MotorCommand> mot_sub(getNode());
+  uavcan::Subscriber<kmti::gimbal::MotorCommand> mot_sub(Node::getNode());
 
   const int mot_sub_start_res = mot_sub.start(
           [&](const uavcan::ReceivedDataStructure<kmti::gimbal::MotorCommand>& msg)
           {
-              if(msg.power[AXIS] == 0.0f) {
-                  disableOutput();
-              } else {
-                  float cmd = msg.cmd[AXIS];
-                  float power = HALF_POWER * msg.power[AXIS];
-                  palSetPad(GPIOB, GPIOB_EN1);
-                  palSetPad(GPIOB, GPIOB_EN2);
-                  palSetPad(GPIOB, GPIOB_EN3);
-                  if(msg.power[AXIS] > 0) {
-                      pwmEnableChannel(&PWMD3, 2, (HALF_POWER + power * sinf(cmd)));
-                      pwmEnableChannel(&PWMD3, 1, (HALF_POWER + power * sinf(cmd - 2.094)));
-                      pwmEnableChannel(&PWMD3, 0, (HALF_POWER + power * sinf(cmd + 2.094)));
-                  } else { //Change 2 phases over
-                      pwmEnableChannel(&PWMD3, 1, (HALF_POWER - power * sinf(cmd)));
-                      pwmEnableChannel(&PWMD3, 2, (HALF_POWER - power * sinf(cmd - 2.094)));
-                      pwmEnableChannel(&PWMD3, 0, (HALF_POWER - power * sinf(cmd + 2.094)));
-                  }
-              }
+              cmd_power = msg.cmd[AXIS];
               lastCommandTime = chVTGetSystemTime();
           });
 
@@ -192,35 +221,23 @@ int main(void) {
       chSysHalt("Failed to start subscriber");
   }
 
-  uavcan::Publisher<kmti::gimbal::MotorStatus> status_pub(getNode());
+  uavcan::Publisher<kmti::gimbal::MotorStatus> status_pub(Node::getNode());
   status_pub.init();
   kmti::gimbal::MotorStatus status_msg;
   status_msg.axis_id = AXIS;
 
-  getNode().setModeOperational();
-
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, (tfunc_t)Thread1, NULL);
-  chThdCreateStatic(waThread2, sizeof(waThread2), NORMALPRIO, (tfunc_t)Thread2, NULL);
+  chThdCreateStatic(waRotoryEncThd, sizeof(waRotoryEncThd), NORMALPRIO+1, (tfunc_t)RotoryEncThd, NULL);
 
   while(1) {
-      if(getNode().spin(uavcan::MonotonicDuration::fromMSec(10)) < 0){
-      }
-      if(lastCommandTime != 0 && lastCommandTime + MS2ST(500) < chVTGetSystemTime()) {
+      if(lastCommandTime != 0 && lastCommandTime + MS2ST(200) < chVTGetSystemTime()) {
           lastCommandTime = 0;
           disableOutput();
+          cmd_power = 0.0f;
       }
-
-      spiAcquireBus(&SPID1);
-      spiStart(&SPID1, &ls_spicfg);
-      spiSelect(&SPID1);
-      spiExchange(&SPID1, 2, AS5048A_ANGLE, &spi_rx_buf);
-      spiUnselect(&SPID1);
-
-      spiReleaseBus(&SPID1);
-      uint16_t mot_pos = spi_rx_buf[0] << 8 & 0x3F00;
-      mot_pos |= spi_rx_buf[1] & 0x00FF;
-      status_msg.motor_pos = mot_pos * 0.00038349519f;
-      status_pub.broadcast(status_msg);
+      chThdSleepMilliseconds(100);
+      //status_msg.motor_pos = mot_pos * 0.00038349519f;
+     //status_pub.broadcast(status_msg);
   }
 }
 
