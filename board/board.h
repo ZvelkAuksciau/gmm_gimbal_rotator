@@ -91,6 +91,8 @@
  * Port B setup.
  * Everything input with pull-up except:
  * PB1 PB2  - Push Pull output     (LED).
+ * PB6 - Open drain alternative (I2C1_SCL) DO NOT USE. See errata
+ * PB7 - Open drain alternative (I2C1_SDA) DO NOT USE. See errata
  * PB0 PB4 PB5 - Alternate Push Pull output motor driver.
  * PB10 PB11 PB12 - Push Pull output motor driver.
  * PB10 - Alternate Push pull  (USART3_TX).
@@ -98,7 +100,7 @@
  */
 #define VAL_GPIOBCRL            0x88BB822B      /*  PB7...PB0 */
 #define VAL_GPIOBCRH            0x888222B8      /* PB15...PB8 */
-#define VAL_GPIOBODR            0xFFFFFFFF
+#define VAL_GPIOBODR            0xFFFF0CC0
 
 /*
  * Port C setup.

@@ -6,6 +6,10 @@
 #include <kmti/gimbal/MotorCommand.hpp>
 #include <kmti/gimbal/MotorStatus.hpp>
 
+#include <config/config_storage_flash.hpp>
+#include <config/config.hpp>
+
+
 /*
  * standard 9600 baud serial config.
  */
@@ -93,6 +97,10 @@ void Thread1(void) {
   }
 }
 
+os::config::Param<uint8_t> num_poles("mot.num_poles", 7, 1, 255);
+os::config::Param<int16_t> enc_offset("mot.offset", 0, -16384, 16383);
+os::config::Param<int8_t> direction("mot.dir", 1, -1, 1);
+
 //Running at 5khz
 static THD_WORKING_AREA(waRotoryEncThd, 128);
 void RotoryEncThd(void) {
@@ -133,11 +141,11 @@ void RotoryEncThd(void) {
     if(g_boardStatus == BOARD_NORMAL) {
       if(cmd_power > 0.0f) {
         enableOutput();
-        float command = (int32_t)(mot_pos - zero_pos_avg) * 0.00038349519f * g_numPoles  + reversed * 1.570796f;
+        float command = (int32_t)(mot_pos - enc_offset.get()) * 0.00038349519f * num_poles.get()  + direction.get() * 1.570796f;
         setPwmCommand(command, cmd_power);
       } else if(cmd_power < 0.0f) {
         enableOutput();
-        float command = (int32_t)(mot_pos - zero_pos_avg) * 0.00038349519f * g_numPoles  - reversed * 1.570796f;
+        float command = (int32_t)(mot_pos - enc_offset.get()) * 0.00038349519f * num_poles.get()  - direction.get() * 1.570796f;
         setPwmCommand(command, -cmd_power);
       } else {
         disableOutput();
@@ -167,10 +175,10 @@ void RotoryEncThd(void) {
         int32_t diff = mot_pos - zero_pos_avg;
         if(cmd_angle > 1.0f && !dir_calibrated) {
           if(diff > 0) {
-            reversed = 1;
+            direction.set(1);
             dir_calibrated = true;
           } else if(diff < 0) {
-            reversed = -1;
+            direction.set(-1);
             dir_calibrated = true;
           }
         }
@@ -178,7 +186,8 @@ void RotoryEncThd(void) {
           if(diff < 100 && diff > -100) {
             g_boardStatus &= ~BOARD_CALIBRATING_NUM_POLES;
             poleCalibState = GO_TO_ZERO;
-            g_numPoles = round(cmd_angle/6.2831f);
+            num_poles.set(round(cmd_angle/6.2831f));
+            os::config::save();
           }
         }
         break;
@@ -194,6 +203,9 @@ void RotoryEncThd(void) {
 systime_t lastCommandTime = 0;
 Node::uavcanNodeThread nodeThd;
 
+static void* const ConfigStorageAddress = reinterpret_cast<void*>(0x08000000 + (128 * 1024) - 1024);
+constexpr unsigned ConfigStorageSize = 1024;
+
 int main(void) {
   halInit();
   chSysInit();
@@ -203,6 +215,10 @@ int main(void) {
   sdStart(&SD1, &serialCfg);
   pwmStart(&PWMD3, &pwm_cfg);
   PWMD3.tim->CR1 |= STM32_TIM_CR1_CMS(1); //Set Center aligned mode
+
+  static os::stm32::ConfigStorageBackend config_storage_backend(ConfigStorageAddress, ConfigStorageSize);
+  const int config_init_res = os::config::init(&config_storage_backend);
+
   nodeThd.start(NORMALPRIO-1);
 
   g_boardStatus |= BOARD_CALIBRATING_NUM_POLES; //| BOARD_CALIBRATING_OFFSET;
@@ -227,7 +243,7 @@ int main(void) {
   status_msg.axis_id = AXIS;
 
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, (tfunc_t)Thread1, NULL);
-  chThdCreateStatic(waRotoryEncThd, sizeof(waRotoryEncThd), NORMALPRIO+1, (tfunc_t)RotoryEncThd, NULL);
+  chThdCreateStatic(waRotoryEncThd, sizeof(waRotoryEncThd), NORMALPRIO+10, (tfunc_t)RotoryEncThd, NULL);
 
   while(1) {
       if(lastCommandTime != 0 && lastCommandTime + MS2ST(200) < chVTGetSystemTime()) {

@@ -103,7 +103,7 @@ include $(CHIBIOS)/os/common/ports/ARMCMx/compilers/GCC/mk/port_v7m.mk
 include $(CHIBIOS)/os/various/cpp_wrappers/chcpp.mk
 
 # Define linker script file here
-LDSCRIPT= $(STARTUPLD)/STM32F103xB.ld
+LDSCRIPT= STM32F103xB.ld
 
 # C sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
@@ -125,7 +125,7 @@ UDEFS += -DUAVCAN_STM32_CHIBIOS=1 \
 		 -DUAVCAN_STM32_TIMER_NUMBER=2 \
 		 -DUAVCAN_STM32_NUM_IFACES=1 \
 		 -DUAVCAN_CPP_VERSION=UAVCAN_CPP11 \
-		 -DUAVCAN_TINY=0
+		 -DUAVCAN_TINY=1
 		 
 include $(UAVCAN)/libuavcan/include.mk
 CPPSRC += $(LIBUAVCAN_SRC)
