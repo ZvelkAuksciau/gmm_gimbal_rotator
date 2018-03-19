@@ -11,6 +11,9 @@
 
 namespace Node {
 
+  os::config::Param<uint8_t> node_id("node.id", 1, 1, 127); //0 - automatic detection (not supported)
+  os::config::Param<uint32_t> bus_speed("node.speed", 1000000, 125000, 1000000);
+
   uavcan_stm32::CanInitHelper<> can;
 
   uavcan::Node<NodePoolSize>& getNode() {
@@ -129,6 +132,7 @@ namespace Node {
   class RestartRequestHandler: public uavcan::IRestartRequestHandler {
     bool handleRestartRequest(uavcan::NodeID request_source) override
     {
+      (void) request_source;
       NVIC_SystemReset();
       return true;
     }
@@ -144,11 +148,12 @@ namespace Node {
   }
 
   void uavcanNodeThread::main() {
-    uavcan::uint32_t bitrate = 1000000;
-    can.init(bitrate);
+    can.init(bus_speed.get());
 
     getNode().setName("org.kmti.gmm_controler");
-    getNode().setNodeID(10);
+    if(node_id.get() > 0) {
+        getNode().setNodeID(node_id.get());
+    }
 
     if (getNode().start() < 0) {
       chSysHalt("UAVCAN init fail");

@@ -120,6 +120,7 @@ void Thread1(void) {
 os::config::Param<uint8_t> num_poles("mot.num_poles", 7, 1, 255);
 os::config::Param<float> enc_offset("mot.offset", 0.0f, -M_PI, M_PI);
 os::config::Param<int8_t> direction("mot.dir", 1, -1, 1);
+os::config::Param<uint8_t> axis_id("mot.axis_id", 0, 0, 2); //0 - Pitch; 1 - Roll; 2 - Yaw
 
 //Running at 5khz
 static THD_WORKING_AREA(waRotoryEncThd, 128);
@@ -146,12 +147,7 @@ void RotoryEncThd(void) {
   float cmd_angle = 0.0f;
   bool dir_calibrated = false;
 
-  volatile uint8_t num_pol = num_poles.get();
-  volatile float en_off = enc_offset.get();
-  volatile int8_t rev = direction.get();
-
   while(1) {
-    systime_t time = chVTGetSystemTime() + US2ST(200);
     spiAcquireBus(&SPID1);
     spiStart(&SPID1, &spicfg);
     spiSelect(&SPID1);
@@ -270,9 +266,6 @@ void RotoryEncThd(void) {
   }
 }
 
-//Pitch 0;Roll 1 ;Yaw 2
-#define AXIS 2
-
 systime_t lastCommandTime = 0;
 Node::uavcanNodeThread nodeThd;
 
@@ -294,7 +287,7 @@ int main(void) {
 
   nodeThd.start(NORMALPRIO-1);
 
-  g_boardStatus |= BOARD_CALIBRATING_OFFSET | BOARD_CALIBRATING_NUM_POLES; //| BOARD_CALIBRATING_OFFSET;
+  g_boardStatus |= BOARD_CALIBRATING_OFFSET | BOARD_CALIBRATING_NUM_POLES;
   chThdSleepMilliseconds(200);
 
   uavcan::Subscriber<kmti::gimbal::MotorCommand> mot_sub(Node::getNode());
@@ -302,7 +295,7 @@ int main(void) {
   const int mot_sub_start_res = mot_sub.start(
           [&](const uavcan::ReceivedDataStructure<kmti::gimbal::MotorCommand>& msg)
           {
-              cmd_power = msg.cmd[AXIS];
+              cmd_power = msg.cmd[axis_id.get()];
               lastCommandTime = chVTGetSystemTime();
           });
 
