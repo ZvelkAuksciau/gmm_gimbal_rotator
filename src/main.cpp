@@ -122,7 +122,7 @@ os::config::Param<float> enc_offset("mot.offset", 0.0f, -M_PI, M_PI);
 os::config::Param<int8_t> direction("mot.dir", 1, -1, 1);
 
 //Running at 5khz
-static THD_WORKING_AREA(waRotoryEncThd, 2048);
+static THD_WORKING_AREA(waRotoryEncThd, 128);
 void RotoryEncThd(void) {
   chRegSetThreadName("rotary_position_sensor");
 

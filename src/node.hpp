@@ -6,7 +6,7 @@
 
 namespace Node {
 
-  constexpr unsigned NodePoolSize = 400;
+  constexpr unsigned NodePoolSize = 2048;
   uavcan::Node<NodePoolSize>& getNode();
   void publishKeyValue(const char *key, float value);
 

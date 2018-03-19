@@ -144,7 +144,7 @@ namespace Node {
   }
 
   void uavcanNodeThread::main() {
-    uavcan::uint32_t bitrate = 100000;
+    uavcan::uint32_t bitrate = 1000000;
     can.init(bitrate);
 
     getNode().setName("org.kmti.gmm_controler");
