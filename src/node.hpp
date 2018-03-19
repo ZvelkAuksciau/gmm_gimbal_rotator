@@ -8,6 +8,7 @@ namespace Node {
 
   constexpr unsigned NodePoolSize = 400;
   uavcan::Node<NodePoolSize>& getNode();
+  void publishKeyValue(const char *key, float value);
 
   class uavcanNodeThread : public chibios_rt::BaseStaticThread<4000> {
     public:

@@ -134,6 +134,15 @@ namespace Node {
     }
   } restart_request_handler;
 
+  static uavcan::Publisher<uavcan::protocol::debug::KeyValue> kv_pub(getNode());
+
+  void publishKeyValue(const char *key, float value) {
+      uavcan::protocol::debug::KeyValue kv_msg;
+      kv_msg.key = key;
+      kv_msg.value = value;
+      kv_pub.broadcast(kv_msg);
+  }
+
   void uavcanNodeThread::main() {
     uavcan::uint32_t bitrate = 100000;
     can.init(bitrate);
@@ -144,10 +153,7 @@ namespace Node {
     if (getNode().start() < 0) {
       chSysHalt("UAVCAN init fail");
     }
-
-    uavcan::Publisher<uavcan::protocol::debug::KeyValue> kv_pub(getNode());
     kv_pub.init();
-    uavcan::protocol::debug::KeyValue kv_msg;
 
     getNode().setRestartRequestHandler(&restart_request_handler);
 

@@ -4,8 +4,6 @@
 
 #include <node.hpp>
 #include <kmti/gimbal/MotorCommand.hpp>
-#include <kmti/gimbal/MotorStatus.hpp>
-#include <uavcan/protocol/debug/KeyValue.hpp>
 
 #include <config/config_storage_flash.hpp>
 #include <config/config.hpp>
@@ -152,10 +150,6 @@ void RotoryEncThd(void) {
   volatile float en_off = enc_offset.get();
   volatile int8_t rev = direction.get();
 
-  uavcan::Publisher<uavcan::protocol::debug::KeyValue> kv_pub(Node::getNode());
-  uavcan::protocol::debug::KeyValue kv_msg;
-  kv_pub.init();
-
   while(1) {
     systime_t time = chVTGetSystemTime() + US2ST(200);
     spiAcquireBus(&SPID1);
@@ -205,17 +199,15 @@ void RotoryEncThd(void) {
         setPwmCommand(cmd_angle, 0.4f);
         int32_t diff = mot_pos - avg_calc;
         if(cmd_angle > 1.0f && !dir_calibrated) {
-          kv_msg.key = "mot_dir";
           if(diff > 0) {
-            kv_msg.value = 1.0f;
+            Node::publishKeyValue("mot_dir", 1.0f);
             direction.set(1);
             dir_calibrated = true;
           } else if(diff < 0) {
-            kv_msg.value = -1.0f;
+            Node::publishKeyValue("mot_dir", -1.0f);
             direction.set(-1);
             dir_calibrated = true;
           }
-          kv_pub.broadcast(kv_msg);
         }
         if(cmd_angle > 3.0f) {
           if(diff < 100 && diff > -100) {
@@ -223,9 +215,7 @@ void RotoryEncThd(void) {
             calibState = GO_TO_ZERO;
             disableOutput();
             num_poles.set(round(cmd_angle/6.2831f));
-            kv_msg.key = "mot_poles";
-            kv_msg.value = num_poles.get();
-            kv_pub.broadcast(kv_msg);
+            Node::publishKeyValue("mot_poles", num_poles.get());
             os::config::save();
           }
         }
@@ -249,9 +239,7 @@ void RotoryEncThd(void) {
         setPwmCommand(wrap_2PI(cmd_angle), 0.4f);
         if(cmd_angle >= 4*M_2PI*num_poles.get()) {
           off_avg /= avg_count;
-          kv_msg.key = "mot_pos_off";
-          kv_msg.value = off_avg;
-          kv_pub.broadcast(kv_msg);
+          Node::publishKeyValue("mot_pos_off", off_avg);
           enc_offset.set(off_avg);
           off_avg = 0.0f;
           avg_count = 0;
@@ -266,9 +254,7 @@ void RotoryEncThd(void) {
         setPwmCommand(wrap_2PI(cmd_angle), 0.4f);
         if(cmd_angle <= -4*M_2PI*num_poles.get()) {
           off_avg /= avg_count;
-          kv_msg.key = "mot_neg_off";
-          kv_msg.value = off_avg;
-          kv_pub.broadcast(kv_msg);
+          Node::publishKeyValue("mot_neg_off", off_avg);
           enc_offset.set(enc_offset.get()/2.0f + off_avg/2.0f);
           off_avg = 0.0f;
           avg_count = 0;
@@ -324,11 +310,6 @@ int main(void) {
       chSysHalt("Failed to start subscriber");
   }
 
-  uavcan::Publisher<kmti::gimbal::MotorStatus> status_pub(Node::getNode());
-  status_pub.init();
-  kmti::gimbal::MotorStatus status_msg;
-  status_msg.axis_id = AXIS;
-
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, (tfunc_t)Thread1, NULL);
   chThdCreateStatic(waRotoryEncThd, sizeof(waRotoryEncThd), NORMALPRIO+10, (tfunc_t)RotoryEncThd, NULL);
 
@@ -339,8 +320,6 @@ int main(void) {
           cmd_power = 0.0f;
       }
       chThdSleepMilliseconds(100);
-      //status_msg.motor_pos = mot_pos * 0.00038349519f;
-     //status_pub.broadcast(status_msg);
   }
 }
 
