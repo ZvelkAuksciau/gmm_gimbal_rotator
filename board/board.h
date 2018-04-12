@@ -40,6 +40,9 @@
 #define GPIOB_LED_RED 1
 #define GPIOB_LED_GREEN 2
 #define GPIOA_SPI1NSS 4
+#define GPIOA_SPI1_SCK 5
+#define GPIOA_SPI1_MISO 6
+#define GPIOA_SPI1_MOSI 7
 
 #define GPIOB_IN1 4
 #define GPIOB_IN2 5
@@ -83,7 +86,7 @@
  * PA10 - Alternate Push Pull (USART1_RX).
  * PA15 - Digital input with pull up (ENC_PWM).
  */
-#define VAL_GPIOACRL            0x99918888      /*  PA7...PA0 */
+#define VAL_GPIOACRL            0x88888888      /*  PA7...PA0 */
 #define VAL_GPIOACRH            0x888888B8      /* PA15...PA8 */
 #define VAL_GPIOAODR            0xFFFFFFFF
 

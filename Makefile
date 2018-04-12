@@ -86,7 +86,7 @@ endif
 #
 
 # Define project name here
-PROJECT = gcm_firmware
+PROJECT = gimbal_rotator
 
 # Imported source files and paths
 CHIBIOS = modules/ChibiOS

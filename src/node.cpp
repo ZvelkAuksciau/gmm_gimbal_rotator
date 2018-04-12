@@ -154,6 +154,8 @@ namespace Node {
     if(node_id.get() > 0) {
         getNode().setNodeID(node_id.get());
     }
+    getNode().setName("org.kmti.gimbal_rot");
+    getNode().setNodeID(10);
 
     if (getNode().start() < 0) {
       chSysHalt("UAVCAN init fail");
