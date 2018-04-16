@@ -89,6 +89,9 @@ Node::uavcanNodeThread nodeThd;
 static void* const ConfigStorageAddress = reinterpret_cast<void*>(0x08000000 + (128 * 1024) - 1024);
 constexpr unsigned ConfigStorageSize = 1024;
 
+#define HALF_POWER 750
+#define FULL_POWER HALF_POWER*2
+
 void pwmSetDCMotor(float cmd) {
     enableOutput();
     if(cmd > 0.0f && cmd <= 1.0f) {
@@ -121,16 +124,16 @@ int main(void) {
   static os::stm32::ConfigStorageBackend config_storage_backend(ConfigStorageAddress, ConfigStorageSize);
   const int config_init_res = os::config::init(&config_storage_backend);
 
-  nodeThd.start(NORMALPRIO-1);
+  //nodeThd.start(NORMALPRIO-1);
 
   chThdSleepMilliseconds(200);
 
-  uavcan::Subscriber<kmti::gimbal::GimbalCommand> comm_sub(Node::getNode());
+  //uavcan::Subscriber<kmti::gimbal::GimbalCommand> comm_sub(Node::getNode());
 
   bool up = true;
 
 
-  const int comm_sub_start_res = comm_sub.start(
+/*  const int comm_sub_start_res = comm_sub.start(
           [&](const uavcan::ReceivedDataStructure<kmti::gimbal::GimbalCommand>& msg)
           {
               if(msg.command == msg.COMMAND_RETRACT) up = true;
@@ -139,7 +142,7 @@ int main(void) {
 
   if(comm_sub_start_res < 0) {
       chSysHalt("Failed to start subscriber");
-  }
+  }*/
 
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, (tfunc_t)Thread1, NULL);
 
