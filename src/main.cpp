@@ -3,8 +3,8 @@
 #include <math.h>
 
 #include <node.hpp>
-#include <kmti/gimbal/GimbalCommand.hpp>
-#include <uavcan/protocol/debug/KeyValue.hpp>
+#include <uavcan/equipment/hardpoint/Command.hpp>
+
 
 #include <config/config_storage_flash.hpp>
 #include <config/config.hpp>
@@ -124,43 +124,58 @@ int main(void) {
   static os::stm32::ConfigStorageBackend config_storage_backend(ConfigStorageAddress, ConfigStorageSize);
   const int config_init_res = os::config::init(&config_storage_backend);
 
-  //nodeThd.start(NORMALPRIO-1);
+  nodeThd.start(NORMALPRIO-1);
 
   chThdSleepMilliseconds(200);
 
-  //uavcan::Subscriber<kmti::gimbal::GimbalCommand> comm_sub(Node::getNode());
+  uavcan::Subscriber<uavcan::equipment::hardpoint::Command> comm_sub(Node::getNode());
 
-  bool up = true;
+  bool up = false;
 
 
-/*  const int comm_sub_start_res = comm_sub.start(
-          [&](const uavcan::ReceivedDataStructure<kmti::gimbal::GimbalCommand>& msg)
+  const int comm_sub_start_res = comm_sub.start(
+          [&](const uavcan::ReceivedDataStructure<uavcan::equipment::hardpoint::Command>& msg)
           {
-              if(msg.command == msg.COMMAND_RETRACT) up = true;
-              else if(msg.command == msg.COMMAND_NORMAL) up = false;
+              if(msg.hardpoint_id == 220 && msg.command == 1) up = true;
+              else if(msg.hardpoint_id == 220 && msg.command == 0) up = false;
           });
 
   if(comm_sub_start_res < 0) {
       chSysHalt("Failed to start subscriber");
-  }*/
+  }
+
+  float down_power = 0.3f;
+  float up_power = -0.6;
+  float current_power = 0.0f;
+  float startup_acc = 1.0f; //1.0f means full speed is reached in 1s
+  float stop_acc = 0.2f;
 
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, (tfunc_t)Thread1, NULL);
 
   while(1) {
       if(!up) {
-          if(!palReadPad(GPIOA, GPIOA_SPI1NSS))
+          if(palReadPad(GPIOA, GPIOA_SPI1NSS))
           {
-              pwmSetDCMotor(1.0f);
+              if(fabs(current_power) < fabs(down_power)) {
+                  current_power += down_power/(1000 * startup_acc);
+              } else current_power = down_power;
           } else {
-              pwmSetDCMotor(0.0f);
+              if(fabs(current_power) > fabs(down_power/(1000 * stop_acc)*2.0f)) {
+                  current_power -= down_power/(1000 * stop_acc);
+              } else current_power = 0.0f;
           }
       } else {
-          if(!palReadPad(GPIOA, GPIOA_SPI1_MISO)) {
-              pwmSetDCMotor(-1.0f);
+          if(palReadPad(GPIOA, GPIOA_SPI1_MISO)) {
+              if(fabs(current_power) < fabs(up_power)) {
+                  current_power += up_power/(1000.0f * startup_acc);
+              } else current_power = up_power;
           } else {
-              pwmSetDCMotor(0.0f);
+              if(fabs(current_power) > fabs(up_power/(1000 * stop_acc)*2.0f)) {
+                  current_power -= up_power/(1000 * stop_acc);
+              } else current_power = 0.0f;
           }
       }
+      pwmSetDCMotor(current_power);
       chThdSleepMilliseconds(1);
   }
 }
