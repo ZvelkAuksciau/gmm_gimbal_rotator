@@ -1,6 +1,7 @@
 #include <ch.h>
 #include <hal.h>
 #include <math.h>
+#include "os.hpp"
 
 #include <node.hpp>
 #include <uavcan/equipment/hardpoint/Command.hpp>
@@ -117,59 +118,69 @@ int main(void) {
 
   disableOutput();
 
-  sdStart(&SD1, &serialCfg);
-  pwmStart(&PWMD3, &pwm_cfg);
-  PWMD3.tim->CR1 |= STM32_TIM_CR1_CMS(1); //Set Center aligned mode
-
-  static os::stm32::ConfigStorageBackend config_storage_backend(ConfigStorageAddress, ConfigStorageSize);
-  const int config_init_res = os::config::init(&config_storage_backend);
-
-  nodeThd.start(NORMALPRIO-1);
-
-  chThdSleepMilliseconds(200);
-
-  uavcan::Subscriber<uavcan::equipment::hardpoint::Command> comm_sub(Node::getNode());
-
-  bool up = false;
+    /*
+    * Watchdog
+    */
+    os::watchdog::init();
+    os::watchdog::Timer wdt;
+    wdt.startMSec(5000);
 
 
-  const int comm_sub_start_res = comm_sub.start(
-          [&](const uavcan::ReceivedDataStructure<uavcan::equipment::hardpoint::Command>& msg)
-          {
-              if(msg.hardpoint_id == 220 && msg.command == 1) up = true;
-              else if(msg.hardpoint_id == 220 && msg.command == 0) up = false;
-          });
+    sdStart(&SD1, &serialCfg);
+    pwmStart(&PWMD3, &pwm_cfg);
+    PWMD3.tim->CR1 |= STM32_TIM_CR1_CMS(1); //Set Center aligned mode
 
-  if(comm_sub_start_res < 0) {
+    static os::stm32::ConfigStorageBackend config_storage_backend(ConfigStorageAddress, ConfigStorageSize);
+    const int config_init_res = os::config::init(&config_storage_backend);
+
+    nodeThd.start(NORMALPRIO-1);
+
+    chThdSleepMilliseconds(2000);
+
+    uavcan::Subscriber<uavcan::equipment::hardpoint::Command> comm_sub(Node::getNode());
+
+    bool up = true;
+
+
+    const int comm_sub_start_res =
+            comm_sub.start(
+                    [&](const uavcan::ReceivedDataStructure<uavcan::equipment::hardpoint::Command>& msg)
+                    {
+                        if(msg.hardpoint_id == 220 && msg.command == 1) up = true;
+                        else if(msg.hardpoint_id == 220 && msg.command == 0) up = false;
+                    });
+
+    if(comm_sub_start_res < 0) {
       chSysHalt("Failed to start subscriber");
-  }
+    }
 
-  float down_power = 0.3f;
-  float up_power = -0.6;
-  float current_power = 0.0f;
-  float startup_acc = 1.0f; //1.0f means full speed is reached in 1s
-  float stop_acc = 0.2f;
+    float down_power = 0.3f;
+    float up_power = -0.6;
+    float current_power = 0.0f;
+    float startup_acc = 1.0f; //1.0f means full speed is reached in 1s
+    float stop_acc = 0.2f;
 
-  chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, (tfunc_t)Thread1, NULL);
+    chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, (tfunc_t)Thread1, NULL);
 
   while(1) {
-      if(!up) {
-          if(palReadPad(GPIOA, GPIOA_SPI1NSS))
+      wdt.reset();
+      if(!up) { //If gimbal is commanded to be down
+          if(palReadPad(GPIOA, GPIOA_SPI1NSS)) //If end button is not pressed
           {
               if(fabs(current_power) < fabs(down_power)) {
                   current_power += down_power/(1000 * startup_acc);
               } else current_power = down_power;
-          } else {
+          } else { //If end button is pressed
               if(fabs(current_power) > fabs(down_power/(1000 * stop_acc)*2.0f)) {
                   current_power -= down_power/(1000 * stop_acc);
               } else current_power = 0.0f;
           }
-      } else {
-          if(palReadPad(GPIOA, GPIOA_SPI1_MISO)) {
+      } else { //If gimbal commanded to be up
+          if(palReadPad(GPIOA, GPIOA_SPI1_MISO)) { //If end button is not pressed
               if(fabs(current_power) < fabs(up_power)) {
                   current_power += up_power/(1000.0f * startup_acc);
               } else current_power = up_power;
-          } else {
+          } else { //If end button is pressed
               if(fabs(current_power) > fabs(up_power/(1000 * stop_acc)*2.0f)) {
                   current_power -= up_power/(1000 * stop_acc);
               } else current_power = 0.0f;

@@ -53,7 +53,7 @@ endif
 #
 # Build global options
 ##############################################################################
-USE_CPPOPT += -std=c++11 -fno-rtti -fno-exceptions -fno-threadsafe-statics
+USE_CPPOPT += -std=c++14 -fno-rtti -fno-exceptions -fno-threadsafe-statics
 USE_COPT += -std=c99
 
 ##############################################################################
@@ -126,7 +126,8 @@ UDEFS += -DUAVCAN_STM32_CHIBIOS=1 \
 		 -DUAVCAN_STM32_TIMER_NUMBER=2 \
 		 -DUAVCAN_STM32_NUM_IFACES=1 \
 		 -DUAVCAN_CPP_VERSION=UAVCAN_CPP11 \
-		 -DUAVCAN_TINY=0
+		 -DUAVCAN_TINY=0 \
+		 -DRELEASE_BUILD=1
 		 
 include $(UAVCAN)/libuavcan/include.mk
 CPPSRC += $(LIBUAVCAN_SRC)
