@@ -146,8 +146,14 @@ int main(void) {
             comm_sub.start(
                     [&](const uavcan::ReceivedDataStructure<uavcan::equipment::hardpoint::Command>& msg)
                     {
-                        if(msg.hardpoint_id == 220 && msg.command == 1) up = true;
-                        else if(msg.hardpoint_id == 220 && msg.command == 0) up = false;
+                        if(msg.hardpoint_id == 220 && msg.command == 1){
+                            up = true;
+                            Node::controling_node_id = msg.getSrcNodeID().get();
+                        }
+                        else if(msg.hardpoint_id == 220 && msg.command == 0){
+                            up = false;
+                            Node::controling_node_id = msg.getSrcNodeID().get();
+                        }
                     });
 
     if(comm_sub_start_res < 0) {
@@ -164,6 +170,11 @@ int main(void) {
 
   while(1) {
       wdt.reset();
+
+      if(!Node::isControlingNodeAlive() && Node::controling_node_id != 0) {
+          up = true;
+      }
+
       if(!up) { //If gimbal is commanded to be down
           if(palReadPad(GPIOA, GPIOA_SPI1NSS)) //If end button is not pressed
           {

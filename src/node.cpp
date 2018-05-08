@@ -1,6 +1,9 @@
 #include <node.hpp>
 #include <uavcan/uavcan.hpp>
 #include <uavcan_stm32/uavcan_stm32.hpp>
+
+#include <uavcan/protocol/node_status_monitor.hpp>
+
 //#include <uavcan/protocol/debug/KeyValue.hpp>
 
 //#include <uavcan/protocol/param_server.hpp>
@@ -14,12 +17,89 @@ namespace Node {
 //  os::config::Param<uint8_t> node_id("node.id", 1, 1, 127); //0 - automatic detection (not supported)
 //  os::config::Param<uint32_t> bus_speed("node.speed", 1000000, 125000, 1000000);
 
+    uint8_t controling_node_id = 0;
+    bool controling_node_alive = true;
+
   uavcan_stm32::CanInitHelper<> can;
 
   uavcan::Node<NodePoolSize>& getNode() {
     static uavcan::Node<NodePoolSize> node(can.driver, uavcan_stm32::SystemClock::instance());
     return node;
   }
+
+  bool isControlingNodeAlive() {
+      return controling_node_alive;
+  }
+
+  class NodeMonitor: public uavcan::NodeStatusMonitor {
+    /**
+     * This method is not required to implement.
+     * It is called when a remote node becomes online, changes status, or goes offline.
+     */
+    void handleNodeStatusChange(const NodeStatusChangeEvent& event) override
+    {
+        if (event.was_known) {
+            if(event.status.mode == uavcan::protocol::NodeStatus::MODE_OFFLINE && event.node_id == controling_node_id) {
+                controling_node_alive = false;
+            }
+        }
+    }
+
+    /**
+     * This method is not required to implement.
+     * It is called for every received message uavcan.protocol.NodeStatus after handleNodeStatusChange(), even
+     * if the status code has not changed.
+     */
+    void handleNodeStatusMessage(
+            const uavcan::ReceivedDataStructure<uavcan::protocol::NodeStatus>& msg)
+                    override
+                    {
+        (void) msg;
+        if(msg.getSrcNodeID().get() == controling_node_id && msg.mode != msg.MODE_OFFLINE) {
+            controling_node_alive = true;
+        }
+        //std::cout << "Remote node status message\n" << msg << std::endl << std::endl;
+    }
+
+public:
+    NodeMonitor(uavcan::INode& node) :
+            uavcan::NodeStatusMonitor(node) {
+    }
+
+//    static const char* modeToString(const NodeStatus status) {
+//        switch (status.mode) {
+//        case uavcan::protocol::NodeStatus::MODE_OPERATIONAL:
+//            return "OPERATIONAL";
+//        case uavcan::protocol::NodeStatus::MODE_INITIALIZATION:
+//            return "INITIALIZATION";
+//        case uavcan::protocol::NodeStatus::MODE_MAINTENANCE:
+//            return "MAINTENANCE";
+//        case uavcan::protocol::NodeStatus::MODE_SOFTWARE_UPDATE:
+//            return "SOFTWARE_UPDATE";
+//        case uavcan::protocol::NodeStatus::MODE_OFFLINE:
+//            return "OFFLINE";
+//        default:
+//            return "???";
+//        }
+//    }
+
+
+//    static const char* healthToString(const NodeStatus status) {
+//        switch (status.health) {
+//        case uavcan::protocol::NodeStatus::HEALTH_OK:
+//            return "OK";
+//        case uavcan::protocol::NodeStatus::HEALTH_WARNING:
+//            return "WARNING";
+//        case uavcan::protocol::NodeStatus::HEALTH_ERROR:
+//            return "ERROR";
+//        case uavcan::protocol::NodeStatus::HEALTH_CRITICAL:
+//            return "CRITICAL";
+//        default:
+//            return "???";
+//        }
+//    }
+
+};
 
   /*
    * Param access server
@@ -148,6 +228,8 @@ namespace Node {
 //  }
 
   void uavcanNodeThread::main() {
+    controling_node_id = 0;
+
     uavcan::uint32_t bitrate = 1000000;
     can.init(bitrate);
 
@@ -168,6 +250,9 @@ namespace Node {
 
 //    uavcan::ParamServer server(getNode());
 //    server.start(&param_manager);
+
+    NodeMonitor monitor(getNode());
+    monitor.start();
 
     getNode().setModeOperational();
 
