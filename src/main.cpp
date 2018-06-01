@@ -96,9 +96,9 @@ constexpr unsigned ConfigStorageSize = 1024;
 void pwmSetDCMotor(float cmd) {
     enableOutput();
     if(cmd > 0.0f && cmd <= 1.0f) {
-        pwmEnableChannel(&PWMD3, 0, FULL_POWER*cmd);
+        pwmEnableChannel(&PWMD3, 2, FULL_POWER*cmd);
         pwmEnableChannel(&PWMD3, 1, 0);
-        pwmEnableChannel(&PWMD3, 2, 0);
+        pwmEnableChannel(&PWMD3, 0, 0);
     } else if(cmd < 0.0f && cmd >= -1.0f) {
         pwmEnableChannel(&PWMD3, 0, 0);
         pwmEnableChannel(&PWMD3, 1, -FULL_POWER*cmd);

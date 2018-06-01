@@ -239,7 +239,7 @@ public:
     }
 */
     getNode().setName("org.kmti.gimbal_rot");
-    getNode().setNodeID(10);
+    getNode().setNodeID(40);
 
     if (getNode().start() < 0) {
       chSysHalt("UAVCAN init fail");

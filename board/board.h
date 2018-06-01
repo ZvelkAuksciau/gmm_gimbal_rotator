@@ -86,9 +86,9 @@
  * PA10 - Alternate Push Pull (USART1_RX).
  * PA15 - Digital input with pull up (ENC_PWM).
  */
-#define VAL_GPIOACRL            0x88888888      /*  PA7...PA0 */
+#define VAL_GPIOACRL            0x88288888      /*  PA7...PA0 */
 #define VAL_GPIOACRH            0x888888B8      /* PA15...PA8 */
-#define VAL_GPIOAODR            0xFFFFFFFF
+#define VAL_GPIOAODR            0xFFFFFFDF
 
 /*
  * Port B setup.
